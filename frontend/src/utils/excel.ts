@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { ymd } from "./format";
@@ -86,11 +87,18 @@ export function missingRequired(row: (string | number)[]): number {
 }
 
 export async function exportExcel(rows: (string | number)[][]): Promise<string> {
-  const sheet = XLSX.utils.aoa_to_sheet([HEADERS, ...rows]);
+  return exportSheet([HEADERS, ...rows], "Upload", `Upload_Order_Everpro_${ymd(new Date())}.xlsx`);
+}
+
+export async function exportSheet(aoa: (string | number)[][], sheetName: string, name: string): Promise<string> {
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, "Upload");
+  XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+  if (Platform.OS === "web") {
+    XLSX.writeFile(wb, name);
+    return name;
+  }
   const b64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
-  const name = `Upload_Order_Everpro_${ymd(new Date())}.xlsx`;
   const uri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + name;
   await FileSystem.writeAsStringAsync(uri, b64, { encoding: FileSystem.EncodingType.Base64 });
   if (await Sharing.isAvailableAsync()) {

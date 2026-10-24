@@ -14,7 +14,9 @@ export function Screen({
   onBack,
   action,
   floatingNav = true,
+  headerRight,
 }: {
+  headerRight?: React.ReactNode;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
@@ -42,10 +44,15 @@ export function Screen({
           </Pressable>
         ) : null}
       </View>
-      <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-        {title}
-      </Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <View style={styles.titleRow}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {title}
+          </Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </View>
+        {headerRight}
+      </View>
     </View>
   );
 
@@ -73,6 +80,7 @@ export function Screen({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   headerRow: { flexDirection: "row", alignItems: "center", minHeight: 8 },
   circleBtn: {
     width: 40,

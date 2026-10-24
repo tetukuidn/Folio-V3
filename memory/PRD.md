@@ -75,3 +75,9 @@ Backend 13/13 pytest (`/app/backend/tests/test_lpm_backend.py`), frontend e2e lu
 ## Kurangi stok / barang rusak (June 2026)
 - Stok barang: form title "Stok Persediaan"; red "Kurangi stok barang" button (jenis + jumlah + keterangan) saves to new `rusak` list (backend /api/data field `rusak`).
 - Data stok barang tabs: Semua / Masuk (belanja) / Keluar-rusak (rusak). Rekap: Sisa = Masuk − Terjual − Rusak. FIFO & sisaStok subtract rusak (affects Dashboard + Pesanan baru stock checks).
+
+## Dashboard redesign (June 2026)
+- Profile chip in header (opens sheet: ProfilCard + Hapus semua data with confirm), green gradient hero, shortcut cards, Performa Finansial (Modal %, Total Penjualan, Ongkir, Karantina, Operasional, Laba + margin), sections incl. Ekspedisi Pengiriman. Tested OK (iteration_3).
+
+## Stok barang redesign (June 2026)
+- Card UI per mockup: Ringkasan nilai HPP (tersedia / keluar-rusak), stat boxes, collapsible "Stok Persediaan" form (Tambah + red Kurangi), search, Semua/Masuk/Keluar-rusak chips, item cards (masuk + rusak), edit sheet (edit/hapus w/ confirm), rusak detail sheet (hapus), Download Excel (web fallback XLSX.writeFile).

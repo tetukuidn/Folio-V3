@@ -1,0 +1,40 @@
+{
+  "summary": "Frontend test of the redesigned Dashboard (Expo web, 390x844 and 360x740). I seeded 5 orders spread across today, -10d, -60d and -200d, plus belanja, rusak and a supplier, via PUT /api/data, and checked every number on screen against hand-computed values. All math matched exactly: today's hero, all 6 period filters (Semua/7/1m/3m/6m/range), Modal %, Total Penjualan, Ongkir (excluding codOngkir), Karantina, Operasional, Laba and Margin, and all 5 sections. Stok sekarang subtracts rusak correctly. Also verified: profile chip (fallback namaToko -> namaPemilik -> Google name, Online status), opening the sheet, closing it via the close button and the scrim, editing and saving the profile (persisted, chip updated), Hapus semua data with Batal and Ya (data cleared and persisted after reload, throwaway user), logout (redirects to /login, token cleared, server session returns 401), Stok barang and Supplier navigation and back, Kurangi stok (rekap and dashboard both update), and the other tabs. There is no horizontal page overflow and the last section clears the floating tab bar. I found and fixed one bug in supplier.tsx (text node error). A few minor issues remain, listed below.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Supplier list (app/supplier.tsx:89)", "issue": "`{s.hp && (...)}` rendered an empty-string text node inside a View when the supplier has no WhatsApp number. Web logged 'Unexpected text node'; native would crash with 'Text strings must be rendered within <Text>'. FIXED by T1 to `s.hp ? ... : null`.", "testID": "buka-supplier", "priority": "HIGH (fixed)"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard header @360px", "issues": ["With a long chip name (e.g. 'TEST Reset Google'), the title 'Dashboard' is truncated to 'Dashbo…' and the subtitle wraps to 2 lines. The chip text has maxWidth 110 plus a 40px avatar, which takes too much width. Reduce the chip maxWidth (~90) or hide the subtitle at narrow widths."]},
+      {"screen": "Dashboard hero vs Performa Finansial", "issues": ["Labels are inconsistent. The hero 'Penjualan' shows net omset (transfer - karantina - ongkir; today = Rp105.000), while the 'Total Penjualan' box shows gross transfer (today = Rp120.000 with the 7-day filter). Users will see two different 'penjualan' numbers. Pick one definition or rename the hero label (e.g. 'Omset')."]},
+      {"screen": "Profil sheet (Modal)", "issues": ["The sheet has no KeyboardAvoidingView. On native, the keyboard will cover input-wa-toko and simpan-profil when editing near the bottom of the sheet."]}
+    ],
+    "react_native_issues": [
+      {"component": "DateTimePicker on web", "issue": "@react-native-community/datetimepicker logs 'not supported on: web'. Tapping tanggal-dari or tanggal-sampai does nothing in the web preview, so the custom date range cannot be changed on web (expected per the request: native-only). Reference: app/(tabs)/dashboard.tsx:314-333"},
+      {"component": "Profil sheet keyboard handling", "issue": "The Modal bottom sheet with TextInputs is not wrapped in KeyboardAvoidingView. Reference: app/(tabs)/dashboard.tsx:450-486"}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/seed_dashboard.py"],
+  "action_items": [
+    "Header at 360px: stop the 'Dashboard' title from being truncated when the chip name is long (reduce the chip maxWidth or let the title shrink).",
+    "Make the hero 'Penjualan' and the 'Total Penjualan' box use the same definition, or rename one of them.",
+    "Wrap the profil-sheet content in KeyboardAvoidingView (behavior 'padding' on iOS).",
+    "Optional: on web, show a fallback for the date range (e.g. an <input type=date> or a simple text input), because DateTimePicker does not render on web.",
+    "Minor date-filter edge cases: the '7' preset does not zero the hours (range does). setMonth(-1) overflows on the 29th-31st (e.g. Mar 31 -> Mar 3). Consider normalising the start date to 00:00 and clamping the day.",
+    "Minor: the supplier trash Pressable has no testID or hitSlop (20px icon, so the touch target is under 44px)."
+  ],
+  "critical_code_review_comments": [
+    "dashboard.tsx is 751 lines (>700). Split the Shortcut/MiniBox/Section/Row components and the profile sheet into separate files.",
+    "The 'range' period does not validate that dari <= sampai. If dari is after sampai, nothing matches and there is no message.",
+    "Period presets compute start from the current time (not start of day), which differs from the range preset."
+  ],
+  "updated_files": ["/app/frontend/app/supplier.tsx", "/app/backend/tests/seed_dashboard.py"],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "97% - all requested flows pass; only design/minor issues remain"},
+  "seed_data_creation": "Run `python /app/backend/tests/seed_dashboard.py`. It creates users test-dash-ui (token test_dash_ui_token) and test-dash-reset (token test_dash_reset_token) and seeds 3 jenis, 2 rusak, 1 supplier and 5 orders (2 today, -10d, -60d, -200d). Expected all-period values: Modal Rp120.000 44.4%, Total Penjualan Rp270.000, Ongkir 18.000, Karantina 7.000, Ops 8.000, Laba 117.000, Margin +47.8%; hero today Rp105.000 / Rp62.000 / '2 pesanan · 3 pohon keluar'. Note: an extra rusak TEST_C x1 was added during the UI test, so Stok sekarang is now 9; re-run the seed script to reset it.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login: set localStorage 'lpm_session_token' and go to /dashboard. Tabs have no testIDs; click them by text (Pesanan/Customer/Ekspor/Dashboard). The screen-back testID is used on the stok-barang and supplier screens. Picker options are selected by text (get_by_text(jenis).last).",
+  "rca_of_issue": "Supplier 'Unexpected text node' error: `{s.hp && <Pressable/>}` with s.hp === '' leaves '' as a child of a View. Reproduce: open /supplier with a supplier that has an empty hp. Fixed with a ternary."
+}

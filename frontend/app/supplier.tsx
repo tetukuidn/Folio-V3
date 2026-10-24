@@ -86,11 +86,11 @@ export default function SupplierScreen() {
                 <Ionicons name="trash-outline" size={20} color={colors.accent} />
               </Pressable>
             </View>
-            {s.hp && (
+            {s.hp ? (
               <Pressable onPress={() => Linking.openURL(`https://wa.me/${s.hp}`)}>
                 <Text style={styles.link}>{displayWA(s.hp)}</Text>
               </Pressable>
-            )}
+            ) : null}
             {s.cat ? <Text style={[styles.muted, { marginTop: 4 }]}>{s.cat}</Text> : null}
             <Text style={[styles.muted, { marginTop: 6 }]}>
               {m.count} catatan persediaan · Total HPP {formatRp(m.hpp)}

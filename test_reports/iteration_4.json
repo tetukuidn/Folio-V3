@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend test of redesigned Stok Barang screen (/stok-barang) + Dashboard retest at 390x844 and 360x740 using seeded token test_dash_ui_token. All requested flows WORK: navigation (Dashboard buka-stok-barang, screen-back, direct URL back -> /dashboard), summary math (HPP tersedia Rp70.000, HPP rusak Rp20.000, tersedia 10, rusak 3 on seed - all match FIFO formula), form toggle/title, Picker jenis/supplier, new jenis, live Total HPP, Tambah (new row + merge same jenis+HPP+supplier, separate row for different HPP), Kurangi (rusak saved with FIFO HPP, sisa hint updates), all 3 validation toasts, search (jenis/supplier/keterangan, chip counts update, clear button, empty state), chips Semua/Masuk/Keluar-rusak filtering and stok-item-count, edit sheet (prefill, invalid toast, save jml/hpp/jual/supplier with awal adjusted, close X / scrim, hapus -> batal / ya), rusak sheet (details, close, hapus -> stock returned), Download on web produced valid Stok_Barang_YYYY-MM-DD.xlsx (rows verified by unzipping) and empty-filter toast, persistence after reload, Dashboard numbers (Stok barang 3 jenis / 9 pohon, Stok sekarang, Nilai stok sekarang) update consistently. Dashboard profile sheet opens/closes, header chip fits at 360px, no horizontal overflow at 360/390. No page errors. Ekspor unduh validation toasts work ('Pilih minimal 1 pesanan', missing-cells message); actual Ekspor download not triggered because seeded orders have required cells empty, but it uses the same exportSheet() path verified on Stok download. Deprecated packages detected: none. SafeAreaView issues detected: none. Only minor logic/data-integrity issues found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Hapus baris stok (edit-hapus-ya)", "issue": "Deleting the only belanja row of a jenis (e.g., TEST_C) leaves its rusak records (and pesanan items) orphaned: rusak cards still listed, still counted in 'Keluar (rusak)' and 'Total HPP Keluar/rusak', still exported; sisaStok for that jenis becomes negative. No warning when the row already has stock consumed. Suggest: warn/block deletion when row is consumed, or also offer to remove related rusak. Reference: /app/frontend/app/stok-barang.tsx:364-368", "affected_testIDs": ["edit-hapus-ya", "stok-rusak", "stok-hpp-rusak"]},
+      {"flow": "Edit stok (edit-simpan)", "issue": "No validation that new Jumlah >= already consumed (terjual+rusak) for that jenis; lowering jml makes jenis-level sisa negative while row pill shows 0. Reference: /app/frontend/app/stok-barang.tsx:536-553", "affected_testIDs": ["edit-jml", "edit-simpan"]}
+    ],
+    "design_issues": [
+      {"screen": "Stok barang - rusak card", "issues": ["Name '<jenis> (Keluar)' is truncated already at 390px for short names ('TEST_A (Kelu…') because Rusak tag + 'Rusak: N Pohon' pill share the row; real jenis names (e.g. 'Aglonema Red Sumatra') will show almost nothing. Consider moving Rusak tag below name or allowing 2 lines."]},
+      {"screen": "Ekspor", "issues": ["'Pilih semua' link has no testID"]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [".screenshots/s1_top.png", ".screenshots/s3.png", ".screenshots/s4_sheet.png", ".screenshots/s4_rusak.png", ".screenshots/s7_dash360.png", ".screenshots/s7_stok360.png", ".screenshots/s7_profile.png"],
+  "action_items": [
+    "Handle deletion of a belanja row whose stock is already consumed (warn/block, or cascade to related rusak) so 'Keluar (rusak)' and HPP rusak don't count orphan records (stok-barang.tsx:364)",
+    "EditSheet.save: validate new jml >= consumed qty for the jenis (stok-barang.tsx:536)",
+    "Validate integer quantities: pers-jml / edit-jml accept '2.5' or '1e3' on web (Number() > 0 passes) -> fractional pohon saved (stok-barang.tsx:62-107, 536)",
+    "Jenis matching: willMerge is case-insensitive but sisaStok/stokFIFO/jenisList are case-sensitive; adding '+ Jenis baru' 'test_a' with different HPP creates a duplicate jenis differing only by case - normalise or reject duplicates (stok-barang.tsx:47-52, calc.ts)",
+    "Rusak card name truncation (see design_issues); add testID to Ekspor 'Pilih semua'",
+    "Optional: after Tambah, resetForm clears Harga jual, so a following entry silently saves Jual 0 ('Jual: -'); merge also ignores entered Harga jual"
+  ],
+  "critical_code_review_comments": [
+    "stok-barang.tsx is 764 lines (>700) - split StatBox/MasukItem/RusakItem/Sheet/EditSheet/RusakSheet/styles into src/components/stok/*",
+    "EditSheet derives draft state during render via setState (lastId pattern) - works but fragile; prefer key={item.id} remount",
+    "Rusak records are delete-only (no edit), although card shows a pencil icon - pencil opens a detail sheet; consider info icon or allow editing jml/ket",
+    "Edit jenis is free text and renames only one row; pesanan items with old jenis no longer match FIFO"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% of requested flows functional; 2 minor data-integrity issues"},
+  "seed_data_creation": "Used existing seed (python /app/backend/tests/seed_dashboard.py); test created TEST_D rows / TEST_busuk rusak, then reseeded at end to restore original seed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Seed: belanja ba(TEST_A 6@10000), bb(TEST_B 5@20000), bc(TEST_C 10@5000), rusak r1(A,1), r2(C,2), supplier s1 TEST_Sup, 5 pesanan. Expected stok: tersedia 10, HPP tersedia 70.000, rusak 3, HPP rusak 20.000. Picker options testID picker-item-{value} (__BARU__, __KOSONG__, jenis, supplier id). Toast: toast-text (disappears ~2s). Note '[data-testid^=stok-item-]' also matches stok-item-count. Seeded orders have empty required Ekspor cells so unduh-excel download is blocked by validation.",
+  "rca_of_issue": ""
+}

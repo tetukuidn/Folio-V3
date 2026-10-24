@@ -31,6 +31,7 @@ const light = {
   brand: "#1F5A41",
   onBrand: "#FFFFFF",
   brandPrimary: "#1F5A41",
+  brandDeep: "#123B29",
   onBrandPrimary: "#FFFFFF",
   brandSecondary: "#D5E3DB",
   onBrandSecondary: "#1F5A41",

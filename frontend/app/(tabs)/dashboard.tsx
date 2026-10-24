@@ -1,21 +1,27 @@
 import React, { useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "@/src/components/screen";
-import { Button, Card, Chip } from "@/src/components/ui";
 import { ProfilCard } from "@/src/components/profil-card";
 import { useToast } from "@/src/components/toast";
 import { useStore } from "@/src/store";
-import { colors, fonts, fontSize, radius, spacing } from "@/src/theme";
+import { useAuth } from "@/src/auth";
+import { colors, fonts, fontSize, radius, shadow, spacing } from "@/src/theme";
 import { formatRp, formatTgl } from "@/src/utils/format";
-import { hitungRekap, hppJenis, jenisList, sisaStok, stokFIFO, stokMasuk } from "@/src/utils/calc";
+import { hitungRekap, jenisList, sisaStok, stokFIFO } from "@/src/utils/calc";
 
 type Periode = "all" | "7" | "1m" | "3m" | "6m" | "range";
 
 export default function DashboardScreen() {
-  const { state, reset } = useStore();
+  const { state, reset, profil, sync } = useStore();
+  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const [profilOpen, setProfilOpen] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const toast = useToast();
   const router = useRouter();
   const [periode, setPeriode] = useState<Periode>("all");
@@ -67,6 +73,9 @@ export default function DashboardScreen() {
     let transfer = 0;
     let pohon = 0;
     let hpp = 0;
+    let ongkir = 0;
+    let karantina = 0;
+    let ops = 0;
     for (const p of filteredPesanan) {
       const r = hitungRekap(p);
       untung += r.keuntungan;
@@ -74,9 +83,13 @@ export default function DashboardScreen() {
       transfer += r.totalTransfer;
       pohon += p.items.reduce((a, i) => a + i.jml, 0);
       hpp += r.totalHpp;
+      ongkir += r.og;
+      karantina += p.karantina || 0;
+      ops += p.ops || 0;
     }
     const margin = omset > 0 ? (untung / omset) * 100 : 0;
-    return { untung, omset, transfer, pohon, hpp, margin };
+    const modalPct = transfer > 0 ? (hpp / transfer) * 100 : 0;
+    return { untung, omset, transfer, pohon, hpp, margin, ongkir, karantina, ops, modalPct };
   }, [filteredPesanan]);
 
   const hariIni = useMemo(() => {
@@ -148,6 +161,8 @@ export default function DashboardScreen() {
 
   function resetSemua() {
     reset();
+    setConfirmReset(false);
+    setProfilOpen(false);
     toast.show("Semua data akun ini dihapus");
   }
 
@@ -161,47 +176,83 @@ export default function DashboardScreen() {
   ];
 
   return (
-    <Screen title="Dashboard" subtitle="Ringkasan performa toko">
-      <Card style={styles.today} testID="ringkasan-harian">
-        <View style={styles.todayHead}>
-          <View style={styles.todayBadge}>
-            <Ionicons name="sunny-outline" size={16} color={colors.onBrandPrimary} />
+    <Screen
+      title="Dashboard"
+      subtitle="Ringkasan performa toko"
+      headerRight={
+        <Pressable
+          onPress={() => setProfilOpen(true)}
+          style={({ pressed }) => [styles.profChip, pressed && { transform: [{ scale: 0.97 }] }]}
+          testID="profil-chip"
+        >
+          <View style={{ alignItems: "flex-end", maxWidth: 84 }}>
+            <Text style={styles.profName} numberOfLines={1}>
+              {profil.namaToko || profil.namaPemilik || user?.name || "Toko"}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <View
+                style={[
+                  styles.onlineDot,
+                  { backgroundColor: sync === "error" ? colors.error : sync === "saving" ? colors.warning : colors.action },
+                ]}
+              />
+              <Text style={[styles.profStatus, sync === "error" && { color: colors.error }]} testID="profil-status">
+                {sync === "error" ? "Offline" : sync === "saving" ? "Menyimpan" : "Online"}
+              </Text>
+            </View>
+          </View>
+          {user?.picture ? (
+            <Image source={{ uri: user.picture }} style={styles.profAvatar} />
+          ) : (
+            <View style={[styles.profAvatar, styles.profAvatarFallback]}>
+              <Ionicons name="person" size={18} color={colors.onBrandPrimary} />
+            </View>
+          )}
+        </Pressable>
+      }
+    >
+      <LinearGradient
+        colors={[colors.brandPrimary, colors.brandDeep]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+        testID="ringkasan-harian"
+      >
+        <View style={styles.heroHead}>
+          <View style={styles.heroIcon}>
+            <Ionicons name="sunny-outline" size={18} color={colors.onBrandPrimary} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.todayTitle}>Ringkasan hari ini</Text>
-            <Text style={styles.todayDate} numberOfLines={1}>
-              {formatTgl(new Date().toISOString())}
-            </Text>
+            <Text style={styles.heroTitle}>Ringkasan hari ini</Text>
+            <Text style={styles.heroDate} numberOfLines={1}>{formatTgl(new Date().toISOString())}</Text>
           </View>
         </View>
-
-        <View style={styles.todayRow}>
-          <View style={styles.todayCell}>
-            <Text style={styles.todayLbl}>Penjualan</Text>
-            <Text style={styles.todayVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        <View style={styles.heroRow}>
+          <View style={styles.heroCell}>
+            <Text style={styles.heroLbl}>Penjualan</Text>
+            <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55} testID="hari-ini-penjualan">
               {formatRp(hariIni.omset)}
             </Text>
           </View>
-          <View style={styles.todayDivider} />
-          <View style={styles.todayCell}>
-            <Text style={styles.todayLbl}>Keuntungan</Text>
+          <View style={styles.heroDivider} />
+          <View style={styles.heroCell}>
+            <Text style={styles.heroLbl}>Keuntungan</Text>
             <Text
-              style={[styles.todayVal, hariIni.untung < 0 && { color: colors.accentMuted }]}
+              style={[styles.heroVal, hariIni.untung < 0 && { color: colors.accentMuted }]}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.6}
+              minimumFontScale={0.55}
+              testID="hari-ini-keuntungan"
             >
               {formatRp(hariIni.untung)}
             </Text>
           </View>
         </View>
-
-        <Text style={styles.todayFoot} numberOfLines={1}>
+        <View style={styles.heroLine} />
+        <Text style={styles.heroFoot} numberOfLines={1} testID="hari-ini-foot">
           {hariIni.jml} pesanan · {hariIni.pohon} pohon keluar
         </Text>
-      </Card>
-
-      <ProfilCard />
+      </LinearGradient>
 
       <Shortcut
         icon="leaf-outline"
@@ -210,7 +261,6 @@ export default function DashboardScreen() {
         onPress={() => router.push("/stok-barang")}
         testID="buka-stok-barang"
       />
-
       <Shortcut
         icon="people-outline"
         title="Supplier"
@@ -219,109 +269,166 @@ export default function DashboardScreen() {
         testID="buka-supplier"
       />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 6, paddingVertical: 2 }}
-      >
-        {options.map((o) => (
-          <Chip
-            key={o.k}
-            label={o.l}
-            active={periode === o.k}
-            onPress={() => setPeriode(o.k)}
-            color={periode === o.k ? "pink" : "muted"}
-            testID={`periode-${o.k}`}
-          />
-        ))}
-      </ScrollView>
-
-      {periode === "range" && (
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
-          <Pressable onPress={() => setShowDari(true)} style={styles.dateBtn}>
-            <Text style={styles.dateLbl}>Dari</Text>
-            <Text style={styles.dateVal}>{formatTgl(dari.toISOString())}</Text>
-          </Pressable>
-          <Pressable onPress={() => setShowSampai(true)} style={styles.dateBtn}>
-            <Text style={styles.dateLbl}>Sampai</Text>
-            <Text style={styles.dateVal}>{formatTgl(sampai.toISOString())}</Text>
-          </Pressable>
-          {showDari && (
-            <DateTimePicker
-              value={dari}
-              mode="date"
-              onChange={(_, d) => {
-                setShowDari(Platform.OS === "ios");
-                if (d) setDari(d);
-              }}
-            />
-          )}
-          {showSampai && (
-            <DateTimePicker
-              value={sampai}
-              mode="date"
-              onChange={(_, d) => {
-                setShowSampai(Platform.OS === "ios");
-                if (d) setSampai(d);
-              }}
-            />
-          )}
+      <View style={styles.card} testID="performa-finansial">
+        <View style={styles.finHead}>
+          <View style={styles.finIcon}>
+            <Ionicons name="cash-outline" size={16} color={colors.brandPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.finTitle}>Performa Finansial</Text>
+            <Text style={styles.finSub}>Akumulasi pembukuan</Text>
+          </View>
         </View>
-      )}
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
-      >
-        <Tile label="Keuntungan" val={formatRp(stats.untung)} danger={stats.untung < 0} />
-        <Tile label="Harga jual" val={formatRp(stats.omset)} />
-        <Tile label="Total transfer" val={formatRp(stats.transfer)} />
-        <Tile label="Margin" val={`${stats.margin.toFixed(1)}%`} />
-      </ScrollView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipRow}
+          contentContainerStyle={styles.chipRowContent}
+        >
+          {options.map((o) => {
+            const active = periode === o.k;
+            return (
+              <Pressable
+                key={o.k}
+                onPress={() => setPeriode(o.k)}
+                style={[styles.chip, active && styles.chipActive]}
+                testID={`periode-${o.k}`}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>{o.l}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-      <Card>
-        <Text style={styles.cardTitle}>Pesanan & barang keluar</Text>
+        {periode === "range" && (
+          <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>
+            <Pressable onPress={() => setShowDari(true)} style={styles.dateBtn} testID="tanggal-dari">
+              <Text style={styles.dateLbl}>Dari</Text>
+              <Text style={styles.dateVal} numberOfLines={1}>{formatTgl(dari.toISOString())}</Text>
+            </Pressable>
+            <Pressable onPress={() => setShowSampai(true)} style={styles.dateBtn} testID="tanggal-sampai">
+              <Text style={styles.dateLbl}>Sampai</Text>
+              <Text style={styles.dateVal} numberOfLines={1}>{formatTgl(sampai.toISOString())}</Text>
+            </Pressable>
+            {showDari && (
+              <DateTimePicker
+                value={dari}
+                mode="date"
+                onChange={(_, d) => {
+                  setShowDari(Platform.OS === "ios");
+                  if (d) setDari(d);
+                }}
+              />
+            )}
+            {showSampai && (
+              <DateTimePicker
+                value={sampai}
+                mode="date"
+                onChange={(_, d) => {
+                  setShowSampai(Platform.OS === "ios");
+                  if (d) setSampai(d);
+                }}
+              />
+            )}
+          </View>
+        )}
+
+        <View style={styles.finRow}>
+          <View style={styles.finBox} testID="fin-modal">
+            <View style={styles.finBoxHead}>
+              <Text style={styles.finLbl}>Modal</Text>
+              <View style={styles.pctPill}>
+                <Text style={styles.pctText}>{stats.modalPct.toFixed(1)}%</Text>
+              </View>
+            </View>
+            <Text style={styles.finVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatRp(stats.hpp)}</Text>
+            <Text style={styles.finNote} numberOfLines={1}>Biaya modal produk</Text>
+          </View>
+          <View style={[styles.finBox, { alignItems: "flex-end" }]} testID="fin-total-penjualan">
+            <Text style={styles.finLbl}>Total Penjualan</Text>
+            <Text style={styles.finVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatRp(stats.transfer)}</Text>
+            <Text style={styles.finNote} numberOfLines={1}>Total omset kotor</Text>
+          </View>
+        </View>
+
+        <View style={styles.finRow}>
+          <MiniBox label="Ongkir" val={stats.ongkir} note="Pengiriman" testID="fin-ongkir" />
+          <MiniBox label="Karantina" val={stats.karantina} note="Uji tanaman" testID="fin-karantina" />
+          <MiniBox label="Operasional" val={stats.ops} note="Perlengkapan" testID="fin-operasional" />
+        </View>
+
+        <View style={[styles.labaBox, stats.untung < 0 && styles.labaBoxNeg]} testID="fin-laba">
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" }}>
+              <Text style={[styles.labaLbl, stats.untung < 0 && { color: colors.accent }]}>Laba Bersih (Profit)</Text>
+              <View style={styles.marginPill}>
+                <Text style={[styles.marginText, stats.untung < 0 && { color: colors.accent }]} testID="fin-margin">
+                  {stats.margin >= 0 ? "+" : ""}
+                  {stats.margin.toFixed(1)}% Margin
+                </Text>
+              </View>
+            </View>
+            <Text
+              style={[styles.labaVal, stats.untung < 0 && { color: colors.accent }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+              testID="fin-laba-value"
+            >
+              {formatRp(stats.untung)}
+            </Text>
+          </View>
+          <View style={styles.labaIcon}>
+            <Ionicons
+              name={stats.untung < 0 ? "trending-down" : "trending-up"}
+              size={20}
+              color={stats.untung < 0 ? colors.accent : colors.brandPrimary}
+            />
+          </View>
+        </View>
+      </View>
+
+      <Section title="Pesanan & barang keluar" testID="section-pesanan">
         <Row k="Jumlah pesanan" v={String(filteredPesanan.length)} />
         <Row k="Pohon keluar" v={String(stats.pohon)} />
         <Row k="Total HPP keluar" v={formatRp(stats.hpp)} />
         <Row k="Keuntungan" v={formatRp(stats.untung)} danger={stats.untung < 0} />
-      </Card>
+      </Section>
 
-      <Card>
-        <Text style={styles.cardTitle}>Stok barang (saat ini)</Text>
+      <Section title="Stok barang (saat ini)" testID="section-stok">
         <Row k="Jenis tercatat" v={String(persediaanStats.jenisCount)} />
         <Row k="Stok awal" v={String(persediaanStats.stokAwal)} />
         <Row k="Stok masuk" v={String(persediaanStats.stokMasuk)} />
         <Row k="Stok sekarang" v={String(persediaanStats.stokNow)} />
         <Row k="Total HPP stok barang" v={formatRp(persediaanStats.totalHpp)} />
         <Row k="Nilai stok sekarang" v={formatRp(persediaanStats.nilaiStok)} />
-      </Card>
+      </Section>
 
-      <Card>
-        <Text style={styles.cardTitle}>Stok menipis (≤ 2)</Text>
+      <Section title="Stok menipis (≤ 2)" testID="section-stok-menipis">
         {stokMenipis.length === 0 ? (
           <Text style={styles.muted}>Tidak ada</Text>
         ) : (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             {stokMenipis.map((s) => (
-              <Chip key={s.j} label={`${s.j} · sisa ${s.sisa}`} color="pink" />
+              <View key={s.j} style={styles.tag}>
+                <Text style={styles.tagText} numberOfLines={1}>{s.j} · sisa {s.sisa}</Text>
+              </View>
             ))}
           </View>
         )}
-      </Card>
+      </Section>
 
-      <Card>
-        <Text style={styles.cardTitle}>Jenis terlaris</Text>
+      <Section title="Jenis terlaris" testID="section-terlaris">
         {terlaris.length === 0 ? (
           <Text style={styles.muted}>Belum ada data</Text>
         ) : (
-          <View style={{ marginTop: 6, gap: 6 }}>
+          <View style={{ gap: spacing.md }}>
             {terlaris.map((t) => (
               <View key={t.j}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={styles.jenisName}>{t.j}</Text>
-                  <Text style={styles.muted}>{t.n}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <Text style={styles.jenisName} numberOfLines={1}>{t.j}</Text>
+                  <Text style={styles.rowVal}>{t.n}</Text>
                 </View>
                 <View style={styles.barBg}>
                   <View style={[styles.barFill, { width: `${(t.n / maxTerlaris) * 100}%` }]} />
@@ -330,20 +437,53 @@ export default function DashboardScreen() {
             ))}
           </View>
         )}
-      </Card>
+      </Section>
 
-      <Card>
-        <Text style={styles.cardTitle}>Rekap pengiriman</Text>
+      <Section title="Ekspedisi Pengiriman" testID="section-pengiriman">
         {perKurir.length === 0 ? (
           <Text style={styles.muted}>Belum ada pengiriman</Text>
         ) : (
-          perKurir.map((p) => (
-            <Row key={p.k} k={p.k} v={`${p.count} paket · ${p.kg.toFixed(1)} kg`} />
-          ))
+          perKurir.map((p) => <Row key={p.k} k={p.k} v={`${p.count} paket · ${p.kg.toFixed(1)} kg`} />)
         )}
-      </Card>
+      </Section>
 
-      <Button title="Hapus semua data" kind="out" icon="trash-outline" onPress={resetSemua} testID="reset-demo" />
+      <Modal visible={profilOpen} transparent animationType="slide" onRequestClose={() => setProfilOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <Pressable style={styles.scrim} onPress={() => setProfilOpen(false)} testID="profil-sheet-scrim" />
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]} testID="profil-sheet">
+            <View style={styles.grabber} />
+            <View style={styles.sheetHead}>
+              <Text style={styles.sheetTitle}>Profil & akun</Text>
+              <Pressable onPress={() => setProfilOpen(false)} hitSlop={10} style={styles.closeBtn} testID="profil-sheet-close">
+                <Ionicons name="close" size={18} color={colors.onSurface} />
+              </Pressable>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <ProfilCard />
+              {confirmReset ? (
+                <View style={styles.confirmBox}>
+                  <Text style={styles.confirmText}>
+                    Hapus semua data akun ini (stok, pesanan, supplier)? Tindakan ini tidak bisa dibatalkan.
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                    <Pressable onPress={() => setConfirmReset(false)} style={styles.confirmCancel} testID="reset-batal">
+                      <Text style={styles.confirmCancelText}>Batal</Text>
+                    </Pressable>
+                    <Pressable onPress={resetSemua} style={styles.confirmYes} testID="reset-ya">
+                      <Text style={styles.confirmYesText}>Ya, hapus</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <Pressable onPress={() => setConfirmReset(true)} style={styles.resetBtn} testID="reset-demo">
+                  <Ionicons name="trash-outline" size={16} color={colors.accent} />
+                  <Text style={styles.resetText}>Hapus semua data</Text>
+                </Pressable>
+              )}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </Screen>
   );
 }
@@ -362,44 +502,45 @@ function Shortcut({
   testID?: string;
 }) {
   return (
-    <Pressable onPress={onPress} testID={testID}>
-      <Card style={styles.shortcut}>
-        <View style={styles.shortcutIcon}>
-          <Ionicons name={icon} size={22} color={colors.brandPrimary} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.shortcutTitle} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={styles.muted} numberOfLines={1}>
-            {sub}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.muted} />
-      </Card>
+    <Pressable
+      onPress={onPress}
+      testID={testID}
+      style={({ pressed }) => [styles.card, styles.shortcut, pressed && { transform: [{ scale: 0.99 }] }]}
+    >
+      <View style={styles.shortcutIcon}>
+        <Ionicons name={icon} size={20} color={colors.brandPrimary} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.shortcutTitle} numberOfLines={1}>{title}</Text>
+        <Text style={styles.muted} numberOfLines={1}>{sub}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.muted} />
     </Pressable>
   );
 }
 
-function Tile({ label, val, danger }: { label: string; val: string; danger?: boolean }) {
+function MiniBox({ label, val, note, testID }: { label: string; val: number; note: string; testID?: string }) {
   return (
-    <View style={styles.tile}>
-      <Text style={styles.muted} numberOfLines={1}>{label}</Text>
-      <Text
-        style={[styles.tileVal, danger && { color: colors.accent }]}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
-      >
-        {val}
-      </Text>
+    <View style={[styles.finBox, styles.miniBox]} testID={testID}>
+      <Text style={styles.finLbl} numberOfLines={1}>{label}</Text>
+      <Text style={styles.miniVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatRp(val)}</Text>
+      <Text style={styles.finNote} numberOfLines={1}>{note}</Text>
+    </View>
+  );
+}
+
+function Section({ title, children, testID }: { title: string; children: React.ReactNode; testID?: string }) {
+  return (
+    <View style={styles.card} testID={testID}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {children}
     </View>
   );
 }
 
 function Row({ k, v, danger }: { k: string; v: string; danger?: boolean }) {
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 5, gap: 8 }}>
+    <View style={styles.row}>
       <Text style={styles.rowKey} numberOfLines={1}>{k}</Text>
       <Text
         style={[styles.rowVal, danger && { color: colors.accent }]}
@@ -413,66 +554,198 @@ function Row({ k, v, danger }: { k: string; v: string; danger?: boolean }) {
   );
 }
 
+const tabular = { fontVariant: ["tabular-nums" as const] };
+const W = "rgba(255,255,255,";
+
 const styles = StyleSheet.create({
-  today: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary, gap: spacing.md },
-  todayHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  todayBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.18)",
+  profChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingLeft: spacing.md,
+    paddingRight: 4,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.surfaceSecondary,
+    ...shadow.card,
+  },
+  profName: { fontFamily: fonts.semibold, fontSize: fontSize.sm, color: colors.onSurface },
+  profStatus: { fontFamily: fonts.medium, fontSize: 10, color: colors.success },
+  onlineDot: { width: 6, height: 6, borderRadius: 3 },
+  profAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceTertiary },
+  profAvatarFallback: { backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
+
+  hero: { borderRadius: 24, padding: spacing.lg, overflow: "hidden" },
+  heroHead: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  heroIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: W + "0.14)",
+    borderWidth: 1,
+    borderColor: W + "0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
-  todayTitle: { fontFamily: fonts.display, fontSize: fontSize.lg + 1, color: colors.onBrandPrimary },
-  todayDate: { fontFamily: fonts.body, fontSize: fontSize.sm, color: "rgba(255,255,255,0.75)" },
-  todayRow: { flexDirection: "row", alignItems: "stretch" },
-  todayCell: { flex: 1, minWidth: 0, gap: 2 },
-  todayDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.22)", marginHorizontal: spacing.md },
-  todayLbl: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: "rgba(255,255,255,0.78)" },
-  todayVal: { fontFamily: fonts.display, fontSize: fontSize.xxl - 2, color: colors.onBrandPrimary },
-  todayFoot: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: "rgba(255,255,255,0.78)" },
-  cardTitle: { fontFamily: fonts.display, fontSize: fontSize.xl - 2, color: colors.onSurface, marginBottom: 6 },
-  muted: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.base - 1 },
-  shortcut: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  heroTitle: { fontFamily: fonts.semibold, fontSize: fontSize.lg, color: colors.onBrandPrimary },
+  heroDate: { fontFamily: fonts.body, fontSize: fontSize.sm, color: W + "0.75)" },
+  heroRow: { flexDirection: "row", marginTop: spacing.xl },
+  heroCell: { flex: 1, minWidth: 0, gap: 4 },
+  heroDivider: { width: 1, backgroundColor: W + "0.2)", marginHorizontal: spacing.md },
+  heroLbl: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: W + "0.78)" },
+  heroVal: { fontFamily: fonts.bold, fontSize: fontSize.xxl, color: colors.onBrandPrimary, ...tabular },
+  heroLine: { height: 1, backgroundColor: W + "0.16)", marginVertical: spacing.lg },
+  heroFoot: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: W + "0.85)" },
+
+  card: { backgroundColor: colors.surfaceSecondary, borderRadius: 20, padding: spacing.lg, ...shadow.card },
+  shortcut: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 72 },
   shortcutIcon: {
     width: 44,
     height: 44,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceTertiary,
+    borderRadius: 14,
+    backgroundColor: colors.brandTertiary,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  shortcutTitle: { fontFamily: fonts.display, fontSize: fontSize.lg + 2, color: colors.onSurface },
-  tile: {
-    width: 152,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: radius.lg,
+  shortcutTitle: { fontFamily: fonts.semibold, fontSize: fontSize.lg, color: colors.onSurface },
+  muted: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.sm + 1 },
+
+  finHead: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  finIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: colors.brandTertiary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  finTitle: { fontFamily: fonts.semibold, fontSize: fontSize.base, color: colors.onSurface },
+  finSub: { fontFamily: fonts.body, fontSize: 11, color: colors.muted },
+
+  chipRow: { flexGrow: 0, height: 56 },
+  chipRowContent: { gap: 6, alignItems: "center" },
+  chip: {
+    height: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
+    borderColor: colors.divider,
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
-  tileVal: { fontFamily: fonts.display, fontSize: fontSize.xl, color: colors.onSurface, marginTop: 4 },
+  chipActive: { backgroundColor: colors.brandDeep, borderColor: colors.brandDeep },
+  chipText: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: colors.muted },
+  chipTextActive: { color: colors.onBrandPrimary },
+
   dateBtn: {
     flex: 1,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: radius.md + 2,
-    padding: spacing.md,
+    minHeight: 48,
+    borderRadius: 14,
+    padding: spacing.sm + 2,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  dateLbl: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.sm },
-  dateVal: { fontFamily: fonts.bold, color: colors.onSurface, marginTop: 2, fontSize: fontSize.base },
-  barBg: {
-    height: 10,
-    backgroundColor: colors.surfaceTertiary,
-    borderRadius: radius.pill,
-    overflow: "hidden",
-    marginTop: 4,
+  dateLbl: { fontFamily: fonts.medium, color: colors.muted, fontSize: 11 },
+  dateVal: { fontFamily: fonts.semibold, color: colors.onSurface, fontSize: fontSize.base },
+
+  finRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm },
+  finBox: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSecondary,
+    padding: spacing.md,
+    gap: 4,
   },
-  barFill: { height: 10, backgroundColor: colors.brandPrimary, borderRadius: radius.pill },
-  rowKey: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.base - 1, flexShrink: 1 },
-  rowVal: { fontFamily: fonts.bold, color: colors.onSurface, fontSize: fontSize.base },
-  jenisName: { fontFamily: fonts.medium, color: colors.onSurface, fontSize: fontSize.base },
+  miniBox: { padding: spacing.sm + 2, borderRadius: 14 },
+  finBoxHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 4 },
+  finLbl: { fontFamily: fonts.medium, fontSize: 11, color: colors.muted },
+  finVal: { fontFamily: fonts.bold, fontSize: fontSize.lg + 1, color: colors.onSurface, ...tabular },
+  miniVal: { fontFamily: fonts.bold, fontSize: fontSize.sm + 1, color: colors.onSurface, ...tabular },
+  finNote: { fontFamily: fonts.body, fontSize: 10, color: colors.muted },
+  pctPill: { height: 20, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, justifyContent: "center" },
+  pctText: { fontFamily: fonts.medium, fontSize: 10, color: colors.muted, ...tabular },
+
+  labaBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.brandTertiary,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.brandSecondary,
+    padding: spacing.lg,
+    marginTop: 2,
+  },
+  labaBoxNeg: { backgroundColor: colors.accentMuted, borderColor: colors.accentMuted },
+  labaLbl: { fontFamily: fonts.semibold, fontSize: fontSize.sm, color: colors.brandPrimary },
+  marginPill: {
+    height: 20,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceSecondary,
+    justifyContent: "center",
+  },
+  marginText: { fontFamily: fonts.semibold, fontSize: 10, color: colors.brandPrimary, ...tabular },
+  labaVal: { fontFamily: fonts.bold, fontSize: fontSize.xxl, color: colors.brandPrimary, marginTop: 6, ...tabular },
+  labaIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.brandSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sectionTitle: { fontFamily: fonts.bold, fontSize: fontSize.lg, color: colors.onSurface, marginBottom: spacing.md },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm, paddingVertical: 6 },
+  rowKey: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.base, flexShrink: 1 },
+  rowVal: { fontFamily: fonts.bold, color: colors.onSurface, fontSize: fontSize.base, textAlign: "right", ...tabular },
+
+  tag: { height: 26, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: colors.accentMuted, justifyContent: "center" },
+  tagText: { fontFamily: fonts.semibold, fontSize: 11, color: colors.onAccentMuted },
+  jenisName: { flex: 1, fontFamily: fonts.medium, color: colors.onSurface, fontSize: fontSize.base },
+  barBg: { height: 6, backgroundColor: colors.surfaceTertiary, borderRadius: 3, overflow: "hidden", marginTop: 6 },
+  barFill: { height: 6, backgroundColor: colors.action, borderRadius: 3 },
+
+  scrim: { flex: 1, backgroundColor: "rgba(11,31,22,0.45)" },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    maxHeight: "88%",
+  },
+  grabber: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, marginBottom: spacing.md },
+  sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md },
+  sheetTitle: { fontFamily: fonts.bold, fontSize: fontSize.xl, color: colors.onSurface },
+  closeBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
+  resetBtn: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  resetText: { fontFamily: fonts.semibold, fontSize: fontSize.base, color: colors.accent },
+  confirmBox: { marginTop: spacing.md, padding: spacing.md, borderRadius: 16, backgroundColor: colors.accentMuted, gap: spacing.md },
+  confirmText: { fontFamily: fonts.medium, fontSize: fontSize.sm + 1, color: colors.onAccentMuted },
+  confirmCancel: { flex: 1, height: 44, borderRadius: 12, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
+  confirmCancelText: { fontFamily: fonts.semibold, fontSize: fontSize.base, color: colors.onSurface },
+  confirmYes: { flex: 1, height: 44, borderRadius: 12, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  confirmYesText: { fontFamily: fonts.semibold, fontSize: fontSize.base, color: colors.onAccent },
 });
