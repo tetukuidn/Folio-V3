@@ -44,6 +44,9 @@ const light = {
 
   // Action / FAB (hijau terang dari logo)
   action: "#17C06B",
+  navBar: "#1B2333",
+  navActive: "#2ECC8F",
+  navIdle: "#AEB6C4",
   onAction: "#FFFFFF",
   accentMuted: "#FBE6EC",
   onAccentMuted: "#C42F5C",

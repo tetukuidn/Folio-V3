@@ -1,16 +1,17 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { TabTriggerSlotProps } from "expo-router/ui";
 import { useRouter } from "expo-router";
 import { colors, fonts, fontSize, nav, radius, shadow, spacing } from "../theme";
 
+const FAB = Math.round(nav.barHeight * 0.8);
+
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  dashboard: "stats-chart",
-  pesanan: "receipt",
-  customer: "cart",
-  ekspor: "cloud-upload",
+  dashboard: "grid-outline",
+  pesanan: "document-text-outline",
+  customer: "people-outline",
+  ekspor: "download-outline",
 };
 
 type TabItemData = { key: string; name: string; label: string; focused: boolean; onPress: () => void };
@@ -70,7 +71,7 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab, nav
             <TabItem key={key} {...it} />
           ))}
         </View>
-        <View style={{ width: nav.fabSize + fabGap }} />
+        <View style={{ width: FAB + fabGap }} />
         <View style={[styles.group, { paddingLeft: narrow ? 2 : spacing.sm }]}>
           {right.map(({ key, ...it }) => (
             <TabItem key={key} {...it} />
@@ -85,7 +86,7 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab, nav
           testID="fab-pesanan-baru"
           accessibilityLabel="Pesanan baru"
         >
-          <Ionicons name="add" size={Math.round(nav.fabSize * 0.52)} color={colors.onAction} />
+          <Ionicons name="add" size={Math.round(FAB * 0.6)} color={colors.navBar} />
         </Pressable>
       </View>
     </View>
@@ -113,11 +114,7 @@ function TabItem({
       accessibilityLabel={label}
       accessibilityState={{ selected: focused }}
     >
-      <Ionicons
-        name={focused ? icon : (`${icon}-outline` as keyof typeof Ionicons.glyphMap)}
-        size={20}
-        color={focused ? colors.brandPrimary : "rgba(255,255,255,0.78)"}
-      />
+      <Ionicons name={icon} size={22} color={focused ? colors.navActive : colors.navIdle} />
       <Text
         style={[styles.tabLabel, !focused && styles.tabLabelIdle]}
         numberOfLines={1}
@@ -130,12 +127,19 @@ function TabItem({
   );
 }
 
+// Mint glow under the FAB (same in light/dark)
+const fabGlow = Platform.select({
+  ios: { shadowColor: "#2ECC8F", shadowOpacity: 0.55, shadowRadius: 14, shadowOffset: { width: 0, height: 0 } },
+  android: { elevation: 8 },
+  default: { boxShadow: "0 0 18px rgba(46,204,143,0.55)" },
+}) as object;
+
 const styles = StyleSheet.create({
   wrap: { position: "absolute" },
   pill: {
     height: nav.barHeight,
     borderRadius: radius.pill,
-    backgroundColor: colors.brandPrimary,
+    backgroundColor: colors.navBar,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
@@ -153,33 +157,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 2,
   },
-  tabActive: {
-    backgroundColor: colors.surfaceSecondary,
-  },
+  tabActive: {},
   tabLabel: {
     fontFamily: fonts.semibold,
-    fontSize: Math.max(10, fontSize.sm - 2),
-    color: colors.brandPrimary,
+    fontSize: Math.max(10, fontSize.sm - 1),
+    color: colors.navActive,
     flexShrink: 1,
   },
-  tabLabelIdle: { color: "rgba(255,255,255,0.82)", fontFamily: fonts.medium },
+  tabLabelIdle: { color: colors.navIdle, fontFamily: fonts.medium },
   fabWrap: {
     position: "absolute",
     pointerEvents: "box-none",
     left: 0,
     right: 0,
-    bottom: nav.barHeight - nav.fabSize + nav.fabLift,
+    bottom: (nav.barHeight - FAB) / 2,
     alignItems: "center",
   },
   fab: {
-    width: nav.fabSize,
-    height: nav.fabSize,
-    borderRadius: radius.pill,
-    backgroundColor: colors.action,
+    width: FAB,
+    height: FAB,
+    borderRadius: Math.round(FAB * 0.32),
+    backgroundColor: colors.navActive,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 4,
-    borderColor: colors.surface,
-    ...shadow.float,
+    ...fabGlow,
   },
 });

@@ -81,3 +81,6 @@ Backend 13/13 pytest (`/app/backend/tests/test_lpm_backend.py`), frontend e2e lu
 
 ## Stok barang redesign (June 2026)
 - Card UI per mockup: Ringkasan nilai HPP (tersedia / keluar-rusak), stat boxes, collapsible "Stok Persediaan" form (Tambah + red Kurangi), search, Semua/Masuk/Keluar-rusak chips, item cards (masuk + rusak), edit sheet (edit/hapus w/ confirm), rusak detail sheet (hapus), Download Excel (web fallback XLSX.writeFile).
+
+## Bottom menu redesign (June 2026)
+- Floating tab bar: navy pill (navBar), outline icons grid/document/people/download, mint active (navActive), grey idle, rounded-square mint FAB with glow centered in bar. Ekspor tab label → "Backup". Verified via screenshot (all tabs + FAB navigate, fits at 340px).
