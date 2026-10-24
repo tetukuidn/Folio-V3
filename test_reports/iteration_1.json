@@ -1,0 +1,37 @@
+{
+  "summary": "First post-import test (SDK 58). Backend: 21/21 pytest pass when run serially (repo suite + new extra suite). Under the configured xdist (-n 2 --dist loadscope) one repo test is flaky due to a cross-worker race in the repo's own test fixtures, not an app bug. Frontend: login screen renders at / -> /login with 'Masuk dengan Google' (testID login-google), no bundle errors. CRITICAL bug found and fixed: tapping any bottom tab crashed with 'Cannot read properties of undefined (reading emit)' in src/components/tab-bar.tsx because SDK 58 expo-router bottom tabs pass {emitter, navigateToTab} to tabBar instead of {navigation}. After the fix, dashboard/pesanan/customer/ekspor tabs, FAB->pesanan-baru, stok-barang, supplier and logout all work with an injected session token. Unauth /dashboard redirects to /login; invalid token is cleared.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests/test_lpm_backend.py", "issue": "The session-scoped autouse seed_qa_users fixture runs once per xdist worker and deletes app_data for both QA users. With -n 2 --dist loadscope, TestIsolation.test_user2_write_isolated_from_user1 is flaky because it also relies on user1 data written by TestData, which may run on another worker. Passes reliably with -n 0."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "FloatingTabBar", "issue": "FIXED BY TESTER: tapping a tab crashed the app (red screen) with 'Cannot read properties of undefined (reading emit)'. SDK 58 BottomTabBarProps = {state, descriptors, emitter, navigateToTab, insets}, so there is no `navigation` prop. Patched to use emitter/navigateToTab, falling back to navigation.", "testID": "tab-pesanan / tab-customer / tab-ekspor / tab-dashboard", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "tab-bar SDK58 API change", "issue": "The custom tabBar used the removed `navigation.emit/navigate` props, which broke under the SDK 58 upgrade. Now uses `emitter.emit` + `navigateToTab(route.key)`. Reference: /app/frontend/src/components/tab-bar.tsx:18-50"}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_lpm_backend.py", "/app/backend/tests/test_lpm_extra.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Review the tab-bar.tsx SDK 58 fix (emitter/navigateToTab) and keep it. Also check for any other custom navigator code that depends on react-navigation `navigation` props.",
+    "Optional: make test_lpm_backend.py safe under xdist (e.g. seed and clean data per class, and remove the TestIsolation dependency on TestData) so it doesn't flake with -n 2 --dist loadscope.",
+    "Optional: run `npx expo install --check`, since Metro reports expo 58.0.17 -> ~58.0.19 plus 3 other packages that may need updating."
+  ],
+  "critical_code_review_comments": [
+    "auth.py hardcodes EMERGENT_SESSION_URL and frontend AUTH_BASE. This is acceptable for the Emergent auth integration.",
+    "Backend uses deprecated @app.on_event startup/shutdown (works, but lifespan is preferred).",
+    "No deprecated expo packages (expo-av/expo-barcode-scanner/expo-background-fetch) found; no RN SafeAreaView usage."
+  ],
+  "updated_files": ["/app/frontend/src/components/tab-bar.tsx", "/app/backend/tests/test_lpm_extra.py"],
+  "success_rate": {"backend": "100% (21/21 serial)", "frontend": "100% after tab-bar fix (tabs crashed before fix)"},
+  "seed_data_creation": "Repo tests seed users qa.lpm@example.com (user_qa0000000001, token qa-token-123) and qa2.lpm@example.com (user_qa0000000002, token qa-token-456) in Mongo. qa-token-123 was deleted by the frontend logout test; rerun the pytest to re-seed. The extra suite cleans up its own TEST_ user.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run backend tests with `cd /app/backend && python -m pytest tests/ -n 0`. Frontend auth: localStorage key 'lpm_session_token' = a session token seeded in user_sessions. The frontend env var is EXPO_PUBLIC_BACKEND_URL. Do not tap testID reset-demo (wipes data).",
+  "rca_of_issue": "Tab crash: expo-router 58's forked bottom-tabs calls tabBar({state, descriptors, emitter, navigateToTab, insets}) (node_modules/expo-router/build/react-navigation/bottom-tabs/views/BottomTabView.js:209). The repo code (SDK 57) destructured `navigation`, which is now undefined, so `navigation.emit` threw on press. Mitigation: use emitter/navigateToTab, falling back to navigation."
+}

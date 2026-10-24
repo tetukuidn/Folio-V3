@@ -1,0 +1,158 @@
+{
+  "app_name": "folio",
+  "personality": "4 Tactile layout (floating pill nav, rounded white cards) fused with 8 Botanical/Hand-Drawn organic color palette (sage/mint green)",
+  "personality_one_liner": "A fresh, visually striking bookkeeping tool for plant shops that feels like a modern wellness app rather than a boring spreadsheet.",
+  "color": {
+    "surface": "#F1F5F0",
+    "onSurface": "#111A15",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#111A15",
+    "surfaceTertiary": "#E4EDE7",
+    "onSurfaceTertiary": "#1F5A41",
+    "surfaceInverse": "#1F5A41",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#1F5A41",
+    "brandPrimary": "#1F5A41",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#C42F5C",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#D5E3DB",
+    "onBrandTertiary": "#1F5A41",
+    "success": "#287D56",
+    "onSuccess": "#FFFFFF",
+    "warning": "#E89B17",
+    "onWarning": "#111A15",
+    "error": "#D93847",
+    "onError": "#FFFFFF",
+    "info": "#20688A",
+    "onInfo": "#FFFFFF",
+    "border": "#D5E3DB",
+    "borderStrong": "#A6C2B3",
+    "divider": "#D5E3DB",
+    "muted": "#6A7D73",
+    "onBrand": "#FFFFFF"
+  },
+  "typography": {
+    "displayFontFamily": "Outfit",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24,
+      "3xl": 32,
+      "4xl": 48
+    }
+  },
+  "spacing": {
+    "rule": "Generous vertical breathing room. Cards have ample inner padding. The floating pill nav needs specific bottom inset.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "2",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Use frosted glass on the Login screen Google button.",
+      "Apply slight blur to sticky headers if content scrolls beneath.",
+      "The bottom pill nav can optionally be solid dark green or heavy frosted dark green, but FAB must be solid pink."
+    ],
+    "dont's": [
+      "Do not blur standard white cards on the dashboard.",
+      "Do not use glass for text inputs."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Login",
+      "purpose": "A striking, trend-2026 entry point that drops all unnecessary text in favor of raw visual appeal and a single CTA.",
+      "states": {
+        "loading": "Centered pink spinner.",
+        "empty": "N/A",
+        "error": "Standard toast for login failure."
+      },
+      "layout": "Full-bleed background image of red/green Aglaonema leaves (dark cinematic macro shot). Heavy dark gradient scrim from top to bottom (transparent to 80% black/dark green at the bottom). Top-aligned: Huge 'folio' wordmark in Outfit font (white), with 'lembar pembukuan penjualan aglonema' in smaller muted white below it. Bottom-aligned (above safe area): A single large frosted glass pill button for Google Sign-in with the text 'Masuk untuk mulai'. ALL OTHER TEXT IS REMOVED."
+    },
+    {
+      "name": "Dashboard",
+      "purpose": "Overview of business health with quick access to Supplier management and Excel export.",
+      "states": {
+        "loading": "Skeleton of metric cards.",
+        "empty": "N/A",
+        "error": "Error message with retry."
+      },
+      "layout": "Soft sage background. Header contains 'Ekspor' button at the top right. Large white Profile card. 2-column grid of metric tiles (sales, stock, etc.). A dedicated full-width white card for 'Supplier' management entry point. Content scrolls behind the floating pill nav."
+    },
+    {
+      "name": "Pesanan",
+      "purpose": "List of orders and entry point for creating new ones.",
+      "states": {
+        "loading": "Skeleton list.",
+        "empty": "Illustration of a clipboard with 'Belum ada pesanan'.",
+        "error": "Error message with retry."
+      },
+      "layout": "List of white cards detailing orders (date, items, total). The '+' FAB in the center of the bottom nav opens a full-screen modal (stack screen) for 'Pesanan Baru' (New Order Form) containing receiver info, cart of plants, cost & transfer recap."
+    },
+    {
+      "name": "Persediaan",
+      "purpose": "Inventory management using FIFO logic.",
+      "states": {
+        "loading": "Skeleton list.",
+        "empty": "Illustration of an empty pot with 'Persediaan kosong'.",
+        "error": "Error message with retry."
+      },
+      "layout": "List of inventory items. Each item is a white card showing current stock and incoming batches."
+    },
+    {
+      "name": "Customer",
+      "purpose": "Track goods sent to specific customers.",
+      "states": {
+        "loading": "Skeleton list.",
+        "empty": "Illustration of a delivery box with 'Belum ada data customer'.",
+        "error": "Error message with retry."
+      },
+      "layout": "List of customers with their total orders/goods-out."
+    }
+  ],
+  "images": {
+    "login_background": {
+      "url": "https://images.unsplash.com/photo-1629099534513-bbc256e2b58a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHxBZ2xhb25lbWElMjBwbGFudCUyMGFlc3RoZXRpY3xlbnwwfHx8fDE3OTE0MzMxODN8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "A cinematic macro shot of an Aglaonema plant with red and green leaves on dark textile"
+    }
+  },
+  "instructions_to_main_agent": [
+    "IMPLEMENT FLOATING PILL NAVIGATION EXACTLY: The bottom tab bar must be a floating absolute container (inset left/right 24px, bottom 32px), with `brandPrimary` (#1F5A41) background and `pill` radius. It should contain 5 slots: Dashboard, Pesanan, (Empty space for FAB), Persediaan, Customer.",
+    "FAB PLACEMENT: The '+' button MUST be a large circular pink (`brandSecondary`: #C42F5C) FAB that floats exactly in the center, slightly overlapping the top edge of the dark green pill navigation bar. This FAB triggers the full-screen 'Pesanan Baru' form.",
+    "ACTIVE TAB STATE: The active tab must be a white pill (`surfaceSecondary`) containing BOTH the icon and label in dark green (`brandPrimary`). Inactive tabs display only the icon in translucent white (e.g., `rgba(255, 255, 255, 0.6)`).",
+    "LOGIN SCREEN TREND 2026: Strictly follow the layout instructions for the Login screen. Use the provided 'login_background' image full-bleed. Apply a heavy gradient scrim over it. Remove all text fields/labels from the original design except the wordmark 'folio', tagline, and the Google 'Masuk untuk mulai' button. Make the Google button frosted glass.",
+    "TYPOGRAPHY: Use 'Outfit' for all large headings and prominent numbers. Use 'Plus Jakarta Sans' for all body text, labels, and form inputs. Ensure black/dark green text (#111A15) on the soft sage background (#F1F5F0).",
+    "SUPPLIER & EKSPOR PLACEMENT: As requested by the user, 'Supplier' is accessed via the Dashboard (e.g., a prominent card). 'Ekspor' (25-column Everpro Excel) should be a header button on the Dashboard, preventing tab bar overcrowding.",
+    "Do NOT use any blue, indigo, or purple across the app. Stick strictly to the green/pink palette defined in the color section."
+  ]
+}
