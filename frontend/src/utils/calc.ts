@@ -13,8 +13,32 @@ export function stokKeluar(state: StoreState, jenis: string): number {
   return n;
 }
 
+export function stokRusak(state: StoreState, jenis: string): number {
+  return (state.rusak || []).filter((r) => r.jenis === jenis).reduce((a, r) => a + r.jml, 0);
+}
+
+// Sisa = Masuk − Terjual − Rusak
 export function sisaStok(state: StoreState, jenis: string): number {
-  return stokMasuk(state, jenis) - stokKeluar(state, jenis);
+  return stokMasuk(state, jenis) - stokKeluar(state, jenis) - stokRusak(state, jenis);
+}
+
+// HPP rata-rata per pohon untuk q pohon yang diambil dari baris tersisa paling lama (FIFO)
+export function hppKeluarFIFO(state: StoreState, jenis: string, q: number): number {
+  const fifo = stokFIFO(state);
+  const rows = state.belanja
+    .filter((b) => b.jenis === jenis)
+    .sort((a, b) => new Date(a.tgl).getTime() - new Date(b.tgl).getTime() || a.id.localeCompare(b.id));
+  let need = q;
+  let val = 0;
+  let took = 0;
+  for (const b of rows) {
+    if (need <= 0) break;
+    const t = Math.min(fifo[b.id] ?? 0, need);
+    val += t * b.harga;
+    took += t;
+    need -= t;
+  }
+  return took > 0 ? Math.round(val / took) : hppJenis(state, jenis);
 }
 
 // HPP rata-rata tertimbang untuk suatu jenis
@@ -51,6 +75,9 @@ export function stokFIFO(state: StoreState): Record<string, number> {
     for (const it of p.items) {
       keluarPerJenis[it.jenis] = (keluarPerJenis[it.jenis] ?? 0) + it.jml;
     }
+  }
+  for (const r of state.rusak || []) {
+    keluarPerJenis[r.jenis] = (keluarPerJenis[r.jenis] ?? 0) + r.jml;
   }
 
   // group belanja by jenis sorted by tgl, id

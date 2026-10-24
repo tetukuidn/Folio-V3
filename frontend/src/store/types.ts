@@ -15,6 +15,16 @@ export type Belanja = {
   jual: number; // harga jual
 };
 
+// Stok keluar karena rusak/mati (mengurangi persediaan, bukan penjualan)
+export type Rusak = {
+  id: string;
+  tgl: string;
+  jenis: string;
+  jml: number;
+  harga: number; // HPP per pohon (FIFO saat dicatat)
+  ket: string;
+};
+
 export type Supplier = { id: string; nama: string; hp: string; cat: string };
 
 export type PesananItem = { jenis: string; jml: number; hpp: number; harga: number };
@@ -55,6 +65,7 @@ export type Sender = {
 
 export type StoreState = {
   belanja: Belanja[];
+  rusak: Rusak[];
   suppliers: Supplier[];
   pesanan: Pesanan[];
   sender: Sender;
@@ -63,6 +74,7 @@ export type StoreState = {
 export function emptyState(): StoreState {
   return {
     belanja: [],
+    rusak: [],
     suppliers: [],
     pesanan: [],
     sender: { nama: "", alamat: "", telp: "", kec: "", kota: "" },

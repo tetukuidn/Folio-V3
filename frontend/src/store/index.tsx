@@ -34,6 +34,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const d = res.data;
     _setState({
       belanja: d.belanja || [],
+      rusak: d.rusak || [],
       suppliers: d.suppliers || [],
       pesanan: d.pesanan || [],
       sender: d.sender || emptyState().sender,

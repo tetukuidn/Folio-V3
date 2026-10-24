@@ -6,13 +6,14 @@ import { Screen } from "@/src/components/screen";
 import { Button, Card, Field, Input, Picker } from "@/src/components/ui";
 import { useToast } from "@/src/components/toast";
 import { useStore } from "@/src/store";
-import type { Belanja } from "@/src/store/types";
+import type { Belanja, Rusak } from "@/src/store/types";
 import { colors, fonts, fontSize, radius, spacing } from "@/src/theme";
-import { formatRp, todayISO, uid } from "@/src/utils/format";
-import { jenisList, stokFIFO } from "@/src/utils/calc";
+import { formatRp, formatTgl, todayISO, uid } from "@/src/utils/format";
+import { hppKeluarFIFO, jenisList, sisaStok, stokFIFO } from "@/src/utils/calc";
 
 const BARU = "__BARU__";
 const KOSONG = "__KOSONG__";
+type Tab = "semua" | "masuk" | "rusak";
 
 export default function PersediaanScreen() {
   const { state, setState } = useStore();
@@ -25,6 +26,8 @@ export default function PersediaanScreen() {
   const [hpp, setHpp] = useState("");
   const [jual, setJual] = useState("");
   const [search, setSearch] = useState("");
+  const [ket, setKet] = useState("");
+  const [tab, setTab] = useState<Tab>("semua");
 
   const allJenis = useMemo(() => jenisList(state), [state]);
   const totalHppLive = (Number(jml) || 0) * (Number(hpp) || 0);
@@ -83,9 +86,38 @@ export default function PersediaanScreen() {
     }
   }
 
+  const sisaJenis = jenis && jenis !== BARU ? sisaStok(state, jenis) : null;
+
+  // Kurangi stok: Sisa baru = Sisa − Jumlah rusak
+  function kurangi() {
+    const q = Number(jml);
+    if (!jenis || jenis === BARU || q <= 0) {
+      toast.show("Pilih jenis yang ada dan isi jumlah pohon");
+      return;
+    }
+    const sisa = sisaStok(state, jenis);
+    if (q > sisa) {
+      toast.show(`Stok ${jenis} hanya tersisa ${sisa} pohon`);
+      return;
+    }
+    const r: Rusak = { id: uid(), tgl: todayISO(), jenis, jml: q, harga: hppKeluarFIFO(state, jenis, q), ket: ket.trim() };
+    setState((s) => ({ ...s, rusak: [r, ...(s.rusak || [])] }));
+    toast.show(`Stok ${jenis} dikurangi ${q} pohon (rusak)`);
+    setJml("");
+    setHpp("");
+    setJual("");
+    setKet("");
+    setTab("rusak");
+  }
+
   function hapus(id: string) {
     setState((s) => ({ ...s, belanja: s.belanja.filter((b) => b.id !== id) }));
     toast.show("Baris dihapus");
+  }
+
+  function hapusRusak(id: string) {
+    setState((s) => ({ ...s, rusak: (s.rusak || []).filter((r) => r.id !== id) }));
+    toast.show("Catatan rusak dihapus, stok dikembalikan");
   }
 
   const supOptions = [KOSONG, ...state.suppliers.map((s) => s.id)];
@@ -103,6 +135,33 @@ export default function PersediaanScreen() {
     });
   }, [state.belanja, state.suppliers, search]);
 
+  const rusakList = useMemo(() => state.rusak || [], [state.rusak]);
+  const filteredRusak = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rusakList;
+    return rusakList.filter((r) => (r.jenis + " " + (r.ket || "")).toLowerCase().includes(q));
+  }, [rusakList, search]);
+
+  // Rumus: Sisa = Total masuk − Terjual − Rusak
+  const rekap = useMemo(() => {
+    const masuk = state.belanja.reduce((a, b) => a + b.jml, 0);
+    const terjual = state.pesanan.reduce((a, p) => a + p.items.reduce((x, i) => x + i.jml, 0), 0);
+    const rusak = rusakList.reduce((a, r) => a + r.jml, 0);
+    const nilaiRusak = rusakList.reduce((a, r) => a + r.jml * r.harga, 0);
+    return { masuk, terjual, rusak, sisa: masuk - terjual - rusak, nilaiRusak };
+  }, [state.belanja, state.pesanan, rusakList]);
+
+  const totalRusakRow = {
+    jml: filteredRusak.reduce((a, r) => a + r.jml, 0),
+    nilai: filteredRusak.reduce((a, r) => a + r.jml * r.harga, 0),
+  };
+
+  const tabs: { k: Tab; l: string }[] = [
+    { k: "semua", l: `Semua (${filtered.length + filteredRusak.length})` },
+    { k: "masuk", l: `Masuk (${filtered.length})` },
+    { k: "rusak", l: `Keluar/rusak (${filteredRusak.length})` },
+  ];
+
   const totalRow = {
     jml: filtered.reduce((a, b) => a + b.jml, 0),
     awal: filtered.reduce((a, b) => a + b.awal, 0),
@@ -118,7 +177,7 @@ export default function PersediaanScreen() {
       floatingNav={false}
     >
       <Card>
-        <Text style={styles.cardTitle}>Tambah stok barang</Text>
+        <Text style={styles.cardTitle} testID="stok-persediaan-title">Stok Persediaan</Text>
         <View style={{ height: spacing.sm }} />
         <Field label="Tanggal">
           <Input value={new Date().toLocaleDateString("id-ID")} editable={false} />
@@ -151,6 +210,11 @@ export default function PersediaanScreen() {
         <Field label="Jumlah pohon" required>
           <Input value={jml} onChangeText={setJml} keyboardType="number-pad" testID="pers-jml" />
         </Field>
+        {sisaJenis !== null && (
+          <Text style={styles.hint} testID="pers-sisa-jenis">
+            Stok {jenis} tersedia: {sisaJenis} pohon
+          </Text>
+        )}
         <Field label="HPP (harga beli)" required>
           <Input value={hpp} onChangeText={setHpp} keyboardType="number-pad" testID="pers-hpp" />
         </Field>
@@ -164,14 +228,58 @@ export default function PersediaanScreen() {
           </Text>
         )}
         <View style={{ height: spacing.md }} />
+        <Field label="Keterangan rusak (opsional, untuk Kurangi)">
+          <Input value={ket} onChangeText={setKet} placeholder="mis. busuk akar" testID="pers-ket" />
+        </Field>
         <Button title="Tambah stok barang" icon="add-outline" onPress={simpan} testID="pers-tambah" />
+        <View style={{ height: spacing.sm }} />
+        <Button title="Kurangi stok barang" icon="remove-outline" kind="danger" onPress={kurangi} testID="pers-kurangi" />
+        <Text style={[styles.muted, { marginTop: 6 }]}>Kurangi: pilih jenis + jumlah pohon rusak. HPP dihitung otomatis.</Text>
       </Card>
 
-      <Input placeholder="Cari jenis atau supplier" value={search} onChangeText={setSearch} />
+      <Card testID="stok-rekap">
+        <Text style={styles.cardTitle}>Rekap stok</Text>
+        <View style={{ height: spacing.sm }} />
+        <RekapRow k="Total masuk" v={`${rekap.masuk} pohon`} />
+        <RekapRow k="− Terjual (pesanan)" v={`${rekap.terjual} pohon`} />
+        <RekapRow k="− Keluar/rusak" v={`${rekap.rusak} pohon`} danger testID="rekap-rusak" />
+        <View style={styles.divider} />
+        <RekapRow k="= Stok sekarang" v={`${rekap.sisa} pohon`} bold testID="rekap-sisa" />
+        <RekapRow k="Nilai HPP rusak" v={formatRp(rekap.nilaiRusak)} danger testID="rekap-nilai-rusak" />
+      </Card>
+
+      <Input placeholder="Cari jenis atau supplier" value={search} onChangeText={setSearch} testID="stok-search" />
 
       <Card>
         <Text style={styles.cardTitle}>Data stok barang</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipRow}
+          contentContainerStyle={styles.chipRowContent}
+        >
+          {tabs.map((t) => {
+            const active = tab === t.k;
+            return (
+              <Pressable
+                key={t.k}
+                onPress={() => setTab(t.k)}
+                style={[styles.chip, active && (t.k === "rusak" ? styles.chipActiveRed : styles.chipActive)]}
+                testID={`stok-tab-${t.k}`}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+                  {t.l}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {tab !== "rusak" && (
+        <>
+        {tab === "semua" && <Text style={styles.sectionLbl}>Masuk</Text>}
+        {filtered.length === 0 && <Text style={styles.muted}>Belum ada stok masuk</Text>}
+        <ScrollView horizontal showsHorizontalScrollIndicator testID="tabel-masuk">
           <View>
             <View style={[styles.tr, styles.thead]}>
               <Text style={[styles.th, styles.cJenis]}>Jenis</Text>
@@ -196,7 +304,7 @@ export default function PersediaanScreen() {
                   <Text style={[styles.td, styles.cAwal]}>{b.awal}</Text>
                   <Text style={[styles.td, styles.cSekarang]}>{fifo[b.id] ?? 0}</Text>
                   <Text style={[styles.td, styles["cTotal HPP"]]}>{formatRp(b.harga * b.jml)}</Text>
-                  <Pressable onPress={() => hapus(b.id)} style={styles.c__}>
+                  <Pressable onPress={() => hapus(b.id)} style={styles.c__} hitSlop={14} testID={`masuk-hapus-${b.id}`}>
                     <Ionicons name="trash-outline" size={16} color={colors.accent} />
                   </Pressable>
                 </View>
@@ -217,8 +325,66 @@ export default function PersediaanScreen() {
             )}
           </View>
         </ScrollView>
+        </>
+        )}
+
+        {tab !== "masuk" && (
+          <>
+            {tab === "semua" && <Text style={[styles.sectionLbl, { color: colors.accent, marginTop: spacing.md }]}>Keluar/rusak</Text>}
+            {filteredRusak.length === 0 ? (
+              <Text style={styles.muted}>Belum ada stok rusak</Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator testID="tabel-rusak">
+                <View>
+                  <View style={[styles.tr, styles.thead]}>
+                    <Text style={[styles.th, styles.rTgl]}>Tanggal</Text>
+                    <Text style={[styles.th, styles.cJenis]}>Jenis</Text>
+                    <Text style={[styles.th, styles.cJml]}>Jml</Text>
+                    <Text style={[styles.th, styles.cHPP]}>HPP</Text>
+                    <Text style={[styles.th, styles["cTotal HPP"]]}>Total HPP</Text>
+                    <Text style={[styles.th, styles.rKet]}>Keterangan</Text>
+                    <Text style={[styles.th, styles.c__]} />
+                  </View>
+                  {filteredRusak.map((r) => (
+                    <View key={r.id} style={styles.tr} testID={`rusak-row-${r.id}`}>
+                      <Text style={[styles.td, styles.rTgl]}>{formatTgl(r.tgl)}</Text>
+                      <Text style={[styles.td, styles.cJenis]} numberOfLines={1}>{r.jenis}</Text>
+                      <Text style={[styles.td, styles.cJml, { color: colors.accent }]}>−{r.jml}</Text>
+                      <Text style={[styles.td, styles.cHPP]}>{formatRp(r.harga)}</Text>
+                      <Text style={[styles.td, styles["cTotal HPP"], { color: colors.accent }]}>{formatRp(r.harga * r.jml)}</Text>
+                      <Text style={[styles.td, styles.rKet]} numberOfLines={1}>{r.ket || "-"}</Text>
+                      <Pressable onPress={() => hapusRusak(r.id)} style={styles.c__} hitSlop={14} testID={`rusak-hapus-${r.id}`}>
+                        <Ionicons name="trash-outline" size={16} color={colors.accent} />
+                      </Pressable>
+                    </View>
+                  ))}
+                  <View style={[styles.tr, styles.ttotalRed]}>
+                    <Text style={[styles.td, styles.rTgl, styles.tdBold]}>Total</Text>
+                    <Text style={[styles.td, styles.cJenis]} />
+                    <Text style={[styles.td, styles.cJml, styles.tdBold]}>−{totalRusakRow.jml}</Text>
+                    <Text style={[styles.td, styles.cHPP]} />
+                    <Text style={[styles.td, styles["cTotal HPP"], styles.tdBold]}>{formatRp(totalRusakRow.nilai)}</Text>
+                    <Text style={[styles.td, styles.rKet]} />
+                    <View style={styles.c__} />
+                  </View>
+                </View>
+              </ScrollView>
+            )}
+          </>
+        )}
       </Card>
     </Screen>
+  );
+}
+
+function RekapRow({ k, v, danger, bold, testID }: { k: string; v: string; danger?: boolean; bold?: boolean; testID?: string }) {
+  return (
+    <View style={styles.rekapRow}>
+      <Text style={[styles.rekapKey, bold && styles.tdBold]}>{k}</Text>
+      <Text style={[styles.rekapVal, danger && { color: colors.accent }, bold && { color: colors.brandPrimary }]} testID={testID}>
+        {v}
+      </Text>
+    </View>
   );
 }
 
@@ -244,6 +410,31 @@ const styles = StyleSheet.create({
   td: { fontFamily: fonts.medium, color: colors.onSurface, fontSize: fontSize.base - 1, paddingHorizontal: 4 },
   tdBold: { fontFamily: fonts.bold },
   ttotal: { backgroundColor: colors.brandTertiary },
+  ttotalRed: { backgroundColor: colors.accentMuted },
+  rTgl: { width: 100 },
+  rKet: { width: 140 },
+  divider: { height: 1, backgroundColor: colors.divider, marginVertical: spacing.sm },
+  subTitle: { fontFamily: fonts.bold, fontSize: fontSize.base + 1, color: colors.accent, marginTop: spacing.sm },
+  sectionLbl: { fontFamily: fonts.bold, fontSize: fontSize.sm, color: colors.brandPrimary, marginBottom: 4 },
+  chipRow: { flexGrow: 0, height: 56 },
+  chipRowContent: { gap: spacing.sm, alignItems: "center" },
+  chip: {
+    height: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceTertiary,
+    borderWidth: 1,
+    borderColor: colors.surfaceTertiary,
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  chipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  chipActiveRed: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { fontFamily: fonts.semibold, fontSize: fontSize.sm, color: colors.onSurfaceTertiary },
+  chipTextActive: { color: colors.onBrandPrimary },
+  rekapRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4, gap: spacing.sm },
+  rekapKey: { fontFamily: fonts.body, fontSize: fontSize.base - 1, color: colors.muted, flexShrink: 1 },
+  rekapVal: { fontFamily: fonts.bold, fontSize: fontSize.base - 1, color: colors.onSurface },
   cJenis: { width: COL.cJenis },
   cSupplier: { width: COL.cSupplier },
   cHPP: { width: COL.cHPP },

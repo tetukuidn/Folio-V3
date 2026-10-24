@@ -22,6 +22,7 @@ class DataPayload(BaseModel):
     model_config = {"extra": "forbid"}
 
     belanja: List[Dict[str, Any]] = Field(default_factory=list)
+    rusak: List[Dict[str, Any]] = Field(default_factory=list)
     suppliers: List[Dict[str, Any]] = Field(default_factory=list)
     pesanan: List[Dict[str, Any]] = Field(default_factory=list)
     sender: Dict[str, Any] = Field(default_factory=lambda: dict(EMPTY_SENDER))
@@ -40,6 +41,7 @@ def _default_profil(user: dict) -> dict:
 def _shape(doc: dict, user: dict) -> dict:
     return {
         "belanja": doc.get("belanja") or [],
+        "rusak": doc.get("rusak") or [],
         "suppliers": doc.get("suppliers") or [],
         "pesanan": doc.get("pesanan") or [],
         "sender": doc.get("sender") or dict(EMPTY_SENDER),
@@ -54,6 +56,7 @@ async def get_data(user: dict = Depends(current_user)):
         doc = {
             "user_id": user["user_id"],
             "belanja": [],
+            "rusak": [],
             "suppliers": [],
             "pesanan": [],
             "sender": dict(EMPTY_SENDER),
@@ -71,12 +74,13 @@ async def get_data(user: dict = Depends(current_user)):
 
 @router.put("/data")
 async def put_data(payload: DataPayload, user: dict = Depends(current_user)):
-    if len(payload.pesanan) > 5000 or len(payload.belanja) > 5000:
+    if len(payload.pesanan) > 5000 or len(payload.belanja) > 5000 or len(payload.rusak) > 5000:
         raise HTTPException(status_code=413, detail="data_too_large")
     await db.app_data.update_one(
         {"user_id": user["user_id"]},
         {"$set": {
             "belanja": payload.belanja,
+            "rusak": payload.rusak,
             "suppliers": payload.suppliers,
             "pesanan": payload.pesanan,
             "sender": payload.sender,

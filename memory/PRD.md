@@ -71,3 +71,7 @@ Backend 13/13 pytest (`/app/backend/tests/test_lpm_backend.py`), frontend e2e lu
 ## Backlog
 - P1: Uji login Google + simpan/ekspor di HP via Expo Go
 - P2: Fitur baru sesuai permintaan
+
+## Kurangi stok / barang rusak (June 2026)
+- Stok barang: form title "Stok Persediaan"; red "Kurangi stok barang" button (jenis + jumlah + keterangan) saves to new `rusak` list (backend /api/data field `rusak`).
+- Data stok barang tabs: Semua / Masuk (belanja) / Keluar-rusak (rusak). Rekap: Sisa = Masuk − Terjual − Rusak. FIFO & sisaStok subtract rusak (affects Dashboard + Pesanan baru stock checks).
