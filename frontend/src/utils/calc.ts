@@ -5,21 +5,44 @@ export function stokMasuk(state: StoreState, jenis: string): number {
   return state.belanja.filter((b) => b.jenis === jenis).reduce((a, b) => a + b.jml, 0);
 }
 
+// Keluar = terjual utama + terjual reseller
 export function stokKeluar(state: StoreState, jenis: string): number {
   let n = 0;
   for (const p of state.pesanan) {
     for (const it of p.items) if (it.jenis === jenis) n += it.jml;
   }
+  for (const p of state.pesananReseller || []) {
+    for (const it of p.items) if (it.jenis === jenis) n += it.jml;
+  }
   return n;
+}
+
+export function stokRetur(state: StoreState, jenis: string): number {
+  return (state.returReseller || []).filter((r) => r.jenis === jenis).reduce((a, r) => a + r.jml, 0);
 }
 
 export function stokRusak(state: StoreState, jenis: string): number {
   return (state.rusak || []).filter((r) => r.jenis === jenis).reduce((a, r) => a + r.jml, 0);
 }
 
-// Sisa = Masuk − Terjual − Rusak
+// Sisa = Masuk + Retur − Terjual utama − Terjual reseller − Rusak
 export function sisaStok(state: StoreState, jenis: string): number {
-  return stokMasuk(state, jenis) - stokKeluar(state, jenis) - stokRusak(state, jenis);
+  return stokMasuk(state, jenis) + stokRetur(state, jenis) - stokKeluar(state, jenis) - stokRusak(state, jenis);
+}
+
+// Harga jual terbaru per jenis + harga reseller (fallback ke harga jual biasa)
+export function hargaJenis(state: StoreState, jenis: string): { jual: number; reseller: number } {
+  const rows = state.belanja
+    .filter((b) => b.jenis === jenis)
+    .sort((a, b) => new Date(b.tgl).getTime() - new Date(a.tgl).getTime());
+  const jual = rows.find((b) => b.jual > 0)?.jual || 0;
+  const reseller = rows.find((b) => (b.hargaReseller || 0) > 0)?.hargaReseller || jual;
+  return { jual, reseller };
+}
+
+// Persen aman (0 jika penyebut 0)
+export function pct(num: number, den: number): number {
+  return den > 0 ? (num / den) * 100 : 0;
 }
 
 // HPP rata-rata per pohon untuk q pohon yang diambil dari baris tersisa paling lama (FIFO)
@@ -78,6 +101,13 @@ export function stokFIFO(state: StoreState): Record<string, number> {
   }
   for (const r of state.rusak || []) {
     keluarPerJenis[r.jenis] = (keluarPerJenis[r.jenis] ?? 0) + r.jml;
+  }
+  for (const p of state.pesananReseller || []) {
+    for (const it of p.items) keluarPerJenis[it.jenis] = (keluarPerJenis[it.jenis] ?? 0) + it.jml;
+  }
+  // Retur reseller mengembalikan stok (mengurangi total keluar bersih)
+  for (const r of state.returReseller || []) {
+    keluarPerJenis[r.jenis] = (keluarPerJenis[r.jenis] ?? 0) - r.jml;
   }
 
   // group belanja by jenis sorted by tgl, id

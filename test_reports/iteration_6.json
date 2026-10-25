@@ -1,0 +1,33 @@
+{
+  "summary": "RETEST of the iteration 5 fixes. All fixes PASS. Backend: pytest -n 0 34/34 pass. Manual check: a PUT that leaves out the new keys keeps resellers, pesananReseller and rusak; a PUT that sends returReseller:[] clears it; the old 4 keys are always written. FIX 2a: at 390x844, with TEST_A sold 2+2 and returned 4, deleting a sale is blocked with the toast 'Tidak bisa dihapus: TEST_A sudah diretur...'. Deleting the retur is blocked with 'stok TEST_A akan minus'. In both cases the rows stay, and the server data is unchanged. FIX 2b: hist-edit TEST_pr1, jml 2→1, Simpan is blocked with the toast 'TEST_A: sudah diretur 4 pohon...', and the server still has jml 2. Minor fixes: btn-retur and btn-rusak-reseller are both full width (358x52) and the label is not cut. toggle-reseller-row is 324x48; tapping the label row toggles it, and tapping the Switch directly toggles it once, with no double toggle. pakai-harga-reseller fills 18000+15000+5000 = 38000. Regression: a reseller order from the FAB saves and returns to the dashboard. Retur shows max 2 and raises TEST_C stock; rusak from 7 lowers it. Reseller counters are 6/5/1. Dashboard modal stays 120.000 after the reseller actions, then a main order saves (modal 125.000, total 290.000). Three minor issues are new.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "pesanan-baru simpan()", "issue": "After a save it calls router.back() with no canGoBack fallback (pesanan-baru.tsx:252 and the main branch). If the screen was opened directly or refreshed (no history), the screen does not close and the filled form stays. A second tap made a DUPLICATE reseller order; 2 identical records were reproduced. Use the same back() helper as reseller.tsx:231 (canGoBack ? back : replace('/dashboard')).", "testID": "simpan-pesanan", "priority": "MEDIUM"},
+      {"component": "pakai-harga-reseller", "issue": "The link stays visible after it is used when ongkir or karantina > 0. The visibility condition compares transferN to totalJualReseller instead of the filled target (totalJualReseller + ongkir(if not COD) + karantina). pesanan-baru.tsx:598", "testID": "pakai-harga-reseller", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Reseller order edit + Ganti reseller", "issue": "The retur guard (pesanan-baru.tsx:208-220) only checks the reseller now selected. In edit mode 'Ganti reseller' is still allowed, so moving a sale from reseller A (who has returns) to B gets past the guard and leaves A with returned > sold. Also check lama.resellerId when it differs, or turn off Ganti reseller while editing.", "affected_testIDs": ["reseller-ganti", "simpan-pesanan"]}
+    ],
+    "design_issues": [
+      {"screen": "Pesanan baru (edit)", "issues": ["The error toast sits over the 'Simpan perubahan' button at 390x844"]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_rusak_stok.py", "/app/backend/tests/test_reseller.py", "/app/backend/tests/seed_reseller_ui.py"],
+  "action_items": [
+    "pesanan-baru.tsx: after save, use canGoBack() ? router.back() : router.replace('/dashboard') (or replace) so a direct load or refresh cannot double-save.",
+    "pesanan-baru.tsx: in edit mode, either block 'Ganti reseller' or also run the retur guard for the original lama.resellerId.",
+    "Optional: hide pakai-harga-reseller once transfer equals the computed target."
+  ],
+  "critical_code_review_comments": [
+    "data_routes.py put_data with model_fields_set is correct and backward compatible.",
+    "pesanan-baru.tsx is 663 lines, near the 700-line limit."
+  ],
+  "updated_files": ["/app/frontend/app/pesanan-baru.tsx (added testIDs input-ongkir, input-karantina, input-ops)", "/app/backend/tests/seed_reseller_ui.py (new seed: reseller + sales + retur for the retur-guard UI test)"],
+  "success_rate": {"backend": "100% (34/34)", "frontend": "100% of the requested fixes; 3 minor new findings"},
+  "seed_data_creation": "seed_reseller_ui.py seeds TEST_r1, 2 sales TEST_A x2 and retur TEST_A 4 on test_dash_ui_token. Reseeded with seed_dashboard.py at the end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend URL key is EXPO_PUBLIC_BACKEND_URL. GET /api/data returns {data, user}. Run python /app/backend/tests/seed_reseller_ui.py for the retur-guard scenario (TEST_A sisa 1). Open pesanan-baru via fab-pesanan-baru, not goto, otherwise router.back() does nothing."
+}

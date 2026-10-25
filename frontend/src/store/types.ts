@@ -13,6 +13,20 @@ export type Belanja = {
   awal: number;
   harga: number; // HPP beli
   jual: number; // harga jual
+  hargaReseller?: number; // harga jual khusus reseller (opsional)
+};
+
+export type Reseller = { id: string; nama: string; hp: string; cat: string; aktif?: boolean };
+
+// Barang kembali dari reseller (stok bertambah)
+export type ReturReseller = {
+  id: string;
+  tgl: string;
+  resellerId: string;
+  jenis: string;
+  jml: number;
+  hpp: number;
+  ket: string;
 };
 
 // Stok keluar karena rusak/mati (mengurangi persediaan, bukan penjualan)
@@ -23,11 +37,12 @@ export type Rusak = {
   jml: number;
   harga: number; // HPP per pohon (FIFO saat dicatat)
   ket: string;
+  resellerId?: string;
 };
 
 export type Supplier = { id: string; nama: string; hp: string; cat: string };
 
-export type PesananItem = { jenis: string; jml: number; hpp: number; harga: number };
+export type PesananItem = { jenis: string; jml: number; hpp: number; harga: number; hargaNormal?: number };
 
 export type Tipe = "PICKUP" | "DROPOFF" | "COD PICKUP" | "COD DROPOFF";
 export type StatusPesanan = "Dikirim" | "Problem";
@@ -55,6 +70,8 @@ export type Pesanan = {
   status: StatusPesanan;
 };
 
+export type PesananReseller = Pesanan & { resellerId: string; resellerNama: string };
+
 export type Sender = {
   nama: string;
   alamat: string;
@@ -69,6 +86,9 @@ export type StoreState = {
   suppliers: Supplier[];
   pesanan: Pesanan[];
   sender: Sender;
+  resellers: Reseller[];
+  pesananReseller: PesananReseller[];
+  returReseller: ReturReseller[];
 };
 
 export function emptyState(): StoreState {
@@ -78,6 +98,9 @@ export function emptyState(): StoreState {
     suppliers: [],
     pesanan: [],
     sender: { nama: "", alamat: "", telp: "", kec: "", kota: "" },
+    resellers: [],
+    pesananReseller: [],
+    returReseller: [],
   };
 }
 

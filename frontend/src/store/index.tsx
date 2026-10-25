@@ -38,6 +38,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       suppliers: d.suppliers || [],
       pesanan: d.pesanan || [],
       sender: d.sender || emptyState().sender,
+      resellers: d.resellers || [],
+      pesananReseller: d.pesananReseller || [],
+      returReseller: d.returReseller || [],
     });
     setProfil({
       namaPemilik: d.profil?.namaPemilik || "",

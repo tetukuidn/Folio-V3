@@ -10,7 +10,7 @@ import { useStore } from "@/src/store";
 import type { Belanja, Rusak } from "@/src/store/types";
 import { colors, fonts, fontSize, radius, shadow, spacing } from "@/src/theme";
 import { formatRp, formatTgl, todayISO, uid, ymd } from "@/src/utils/format";
-import { hppKeluarFIFO, jenisList, sisaStok, stokFIFO } from "@/src/utils/calc";
+import { hppKeluarFIFO, jenisList, pct, sisaStok, stokFIFO } from "@/src/utils/calc";
 import { exportSheet } from "@/src/utils/excel";
 
 const BARU = "__BARU__";
@@ -30,6 +30,7 @@ export default function PersediaanScreen() {
   const [ket, setKet] = useState("");
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("semua");
+  const [sumber, setSumber] = useState<"all" | "utama" | "reseller">("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Belanja | null>(null);
   const [editingRusak, setEditingRusak] = useState<Rusak | null>(null);
@@ -120,10 +121,20 @@ export default function PersediaanScreen() {
   const jenisLabel = (v: string) => (v === BARU ? "+ Jenis baru" : v);
 
   const q = search.trim().toLowerCase();
-  const masukList = q
-    ? state.belanja.filter((b) => (b.jenis + " " + supName(b.sup)).toLowerCase().includes(q))
-    : state.belanja;
-  const rusakFiltered = q ? rusakList.filter((r) => (r.jenis + " " + (r.ket || "")).toLowerCase().includes(q)) : rusakList;
+  const resNama = (id?: string) => (state.resellers || []).find((r) => r.id === id)?.nama || "Reseller";
+  const masukList =
+    sumber === "reseller"
+      ? []
+      : q
+        ? state.belanja.filter((b) => (b.jenis + " " + supName(b.sup)).toLowerCase().includes(q))
+        : state.belanja;
+  const returFiltered =
+    sumber === "utama"
+      ? []
+      : (state.returReseller || []).filter((r) => !q || (r.jenis + " " + resNama(r.resellerId) + " " + (r.ket || "")).toLowerCase().includes(q));
+  const rusakFiltered = rusakList
+    .filter((r) => (sumber === "all" ? true : sumber === "reseller" ? !!r.resellerId : !r.resellerId))
+    .filter((r) => !q || (r.jenis + " " + (r.ket || "") + " " + (r.resellerId ? resNama(r.resellerId) : "")).toLowerCase().includes(q));
 
   const summary = useMemo(() => {
     let tersedia = 0;
@@ -140,7 +151,7 @@ export default function PersediaanScreen() {
 
   const showMasuk = tab !== "rusak";
   const showRusak = tab !== "masuk";
-  const itemCount = (showMasuk ? masukList.length : 0) + (showRusak ? rusakFiltered.length : 0);
+  const itemCount = (showMasuk ? masukList.length + returFiltered.length : 0) + (showRusak ? rusakFiltered.length : 0);
 
   async function download() {
     if (itemCount === 0) {
@@ -151,6 +162,10 @@ export default function PersediaanScreen() {
     if (showMasuk)
       masukList.forEach((b) =>
         aoa.push(["Masuk", b.tgl.slice(0, 10), b.jenis, supName(b.sup) || "-", b.awal, b.jml, fifo[b.id] ?? 0, b.harga, b.jual, b.harga * b.jml])
+      );
+    if (showMasuk)
+      returFiltered.forEach((r) =>
+        aoa.push(["Retur reseller", r.tgl.slice(0, 10), r.jenis, resNama(r.resellerId) + (r.ket ? ` · ${r.ket}` : ""), "", r.jml, "", r.hpp, "", r.hpp * r.jml])
       );
     if (showRusak)
       rusakFiltered.forEach((r) =>
@@ -165,8 +180,8 @@ export default function PersediaanScreen() {
   }
 
   const tabs: { k: Tab; l: string; dot?: string }[] = [
-    { k: "semua", l: `Semua (${masukList.length + rusakFiltered.length})` },
-    { k: "masuk", l: `Masuk (${masukList.length})`, dot: colors.action },
+    { k: "semua", l: `Semua (${masukList.length + returFiltered.length + rusakFiltered.length})` },
+    { k: "masuk", l: `Masuk (${masukList.length + returFiltered.length})`, dot: colors.action },
     { k: "rusak", l: `Keluar/rusak (${rusakFiltered.length})`, dot: colors.accent },
   ];
 
@@ -343,6 +358,23 @@ export default function PersediaanScreen() {
           })}
         </ScrollView>
 
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow} contentContainerStyle={styles.chipRowContent}>
+          {(
+            [
+              { k: "all", l: "Semua sumber" },
+              { k: "utama", l: "Utama" },
+              { k: "reseller", l: "Reseller" },
+            ] as const
+          ).map((s) => {
+            const active = sumber === s.k;
+            return (
+              <Pressable key={s.k} onPress={() => setSumber(s.k)} style={[styles.chip, active && styles.chipActive]} testID={`stok-sumber-${s.k}`}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>{s.l}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         {itemCount === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="leaf-outline" size={28} color={colors.muted} />
@@ -354,7 +386,33 @@ export default function PersediaanScreen() {
               masukList.map((b) => (
                 <MasukItem key={b.id} b={b} sisa={fifo[b.id] ?? 0} supplier={supName(b.sup) || "Tanpa supplier"} onEdit={() => setEditing(b)} />
               ))}
-            {showRusak && rusakFiltered.map((r) => <RusakItem key={r.id} r={r} onEdit={() => setEditingRusak(r)} />)}
+            {showMasuk &&
+              returFiltered.map((r) => (
+                <View key={r.id} style={styles.item} testID={`retur-item-${r.id}`}>
+                  <View style={styles.itemTop}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={styles.rowCenter}>
+                        <View style={[styles.dot, { backgroundColor: colors.action }]} />
+                        <Text style={styles.itemName} numberOfLines={1}>{r.jenis} (Retur)</Text>
+                      </View>
+                      <Text style={styles.itemSub} numberOfLines={1}>Dari {resNama(r.resellerId)}{r.ket ? ` · ${r.ket}` : ""}</Text>
+                      <Text style={styles.itemSubLight} numberOfLines={1}>{formatTgl(r.tgl)}</Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 6 }}>
+                      <View style={styles.srcBadge}>
+                        <Text style={styles.srcText}>Reseller</Text>
+                      </View>
+                      <View style={[styles.pill, styles.pillOk]}>
+                        <Text style={[styles.pillText, { color: colors.success }]}>+{r.jml} Pohon</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            {showRusak &&
+              rusakFiltered.map((r) => (
+                <RusakItem key={r.id} r={r} src={r.resellerId ? resNama(r.resellerId) : ""} onEdit={() => setEditingRusak(r)} />
+              ))}
           </View>
         )}
       </View>
@@ -424,6 +482,13 @@ function MasukItem({ b, sisa, supplier, onEdit }: { b: Belanja; sisa: number; su
           </View>
           <Text style={styles.itemSub} numberOfLines={1}>{supplier}</Text>
           <Text style={styles.itemSubLight} numberOfLines={1}>Stok Awal: {b.awal} Pohon</Text>
+          {b.hargaReseller ? (
+            <View style={[styles.srcBadge, { alignSelf: "flex-start", marginLeft: 16, marginTop: 6 }]} testID={`stok-reseller-badge-${b.id}`}>
+              <Text style={styles.srcText}>
+                Reseller {formatRp(b.hargaReseller)} · margin {pct(b.hargaReseller - b.harga, b.hargaReseller).toFixed(0)}%
+              </Text>
+            </View>
+          ) : null}
         </View>
         <View style={[styles.pill, low ? styles.pillWarn : styles.pillOk]}>
           <Text style={[styles.pillText, { color: low ? colors.onWarning : colors.success }]} testID={`stok-sisa-${b.id}`}>
@@ -447,7 +512,7 @@ function MasukItem({ b, sisa, supplier, onEdit }: { b: Belanja; sisa: number; su
   );
 }
 
-function RusakItem({ r, onEdit }: { r: Rusak; onEdit: () => void }) {
+function RusakItem({ r, src, onEdit }: { r: Rusak; src: string; onEdit: () => void }) {
   return (
     <View style={styles.item} testID={`rusak-item-${r.id}`}>
       <View style={styles.itemTop}>
@@ -457,7 +522,7 @@ function RusakItem({ r, onEdit }: { r: Rusak; onEdit: () => void }) {
             <Text style={styles.itemName} numberOfLines={1}>{r.jenis} (Keluar)</Text>
           </View>
           <Text style={styles.itemSub} numberOfLines={1}>{r.ket || "Tanpa keterangan"}</Text>
-          <Text style={styles.itemSubLight} numberOfLines={1}>{formatTgl(r.tgl)}</Text>
+          <Text style={styles.itemSubLight} numberOfLines={1}>{formatTgl(r.tgl)} · {src ? `Reseller: ${src}` : "Utama"}</Text>
         </View>
         <View style={{ alignItems: "flex-end", gap: 6 }}>
           <View style={styles.tagRed}>
@@ -544,11 +609,18 @@ function EditSheet({
   onDelete: (id: string) => void;
   onInvalid: (msg: string) => void;
 }) {
-  const [draft, setDraft] = useState({ jenis: "", sup: "", jml: "", harga: "", jual: "" });
+  const [draft, setDraft] = useState({ jenis: "", sup: "", jml: "", harga: "", jual: "", hargaReseller: "" });
   const [lastId, setLastId] = useState<string | null>(null);
   if (item && item.id !== lastId) {
     setLastId(item.id);
-    setDraft({ jenis: item.jenis, sup: item.sup || "", jml: String(item.jml), harga: String(item.harga), jual: item.jual ? String(item.jual) : "" });
+    setDraft({
+      jenis: item.jenis,
+      sup: item.sup || "",
+      jml: String(item.jml),
+      harga: String(item.harga),
+      jual: item.jual ? String(item.jual) : "",
+      hargaReseller: item.hargaReseller ? String(item.hargaReseller) : "",
+    });
   }
   if (!item && lastId) setLastId(null);
 
@@ -576,8 +648,13 @@ function EditSheet({
       awal: Math.max(0, item.awal + (qn - item.jml)),
       harga: h,
       jual: Number(draft.jual) || 0,
+      hargaReseller: Number(draft.hargaReseller) > 0 ? Number(draft.hargaReseller) : undefined,
     });
   }
+
+  const hN = Number(draft.harga) || 0;
+  const jN = Number(draft.jual) || 0;
+  const rN = Number(draft.hargaReseller) || 0;
 
   const supChoices = [{ id: "", nama: "Tanpa supplier" }, ...suppliers];
   return (
@@ -612,6 +689,35 @@ function EditSheet({
           <Input value={draft.jual} onChangeText={(v) => setDraft((d) => ({ ...d, jual: v }))} keyboardType="number-pad" testID="edit-jual" />
         </Field>
       </View>
+      <Field label="Harga Reseller (Rp)">
+        <Input
+          value={draft.hargaReseller}
+          onChangeText={(v) => setDraft((d) => ({ ...d, hargaReseller: v }))}
+          keyboardType="number-pad"
+          placeholder="Kosong = pakai harga jual biasa"
+          testID="edit-harga-reseller"
+        />
+      </Field>
+      <View style={styles.detailBox} testID="edit-reseller-calc">
+        {rN > 0 ? (
+          <>
+            <DetailRow k="Margin reseller" v={`${pct(rN - hN, rN).toFixed(1)}%`} />
+            <DetailRow k="Margin normal" v={jN > 0 ? `${pct(jN - hN, jN).toFixed(1)}%` : "harga jual belum diisi"} />
+            <DetailRow
+              k="Selisih vs harga normal"
+              v={jN > 0 ? `${pct(jN - rN, jN) >= 0 ? "lebih murah" : "lebih mahal"} ${Math.abs(pct(jN - rN, jN)).toFixed(1)}%` : "-"}
+            />
+            {rN < hN && (
+              <Text style={[styles.deleteText, { fontSize: fontSize.sm, marginTop: 4 }]} testID="edit-reseller-warning">
+                Harga reseller di bawah HPP — rugi per pohon {formatRp(hN - rN)}
+              </Text>
+            )}
+          </>
+        ) : (
+          <Text style={styles.lbl}>Harga reseller belum diatur (dipakai harga jual biasa)</Text>
+        )}
+      </View>
+      <View style={{ height: spacing.md }} />
       <Button title="Simpan perubahan" icon="checkmark" onPress={save} testID="edit-simpan" />
       {item && <ConfirmDelete key={item.id} label="Hapus baris stok" onDelete={() => onDelete(item.id)} testPrefix="edit" />}
     </Sheet>
@@ -753,7 +859,16 @@ const styles = StyleSheet.create({
   pillWarn: { backgroundColor: colors.surfaceSecondary, borderColor: colors.warning },
   pillRed: { backgroundColor: colors.accentMuted, borderColor: colors.accentMuted },
   pillText: { fontFamily: fonts.semibold, fontSize: 11, ...tabular },
-  tagRed: { height: 22, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.accentMuted, justifyContent: "center", flexShrink: 0 },
+  tagRed: {
+    height: 22,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: colors.accentMuted,
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  srcBadge: { height: 22, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.brandTertiary, justifyContent: "center" },
+  srcText: { fontFamily: fonts.semibold, fontSize: 11, color: colors.brandPrimary, ...tabular },
   itemLine: { height: 1, backgroundColor: colors.divider, marginVertical: spacing.md },
   priceRow: { flex: 1 },
   priceLbl: { fontFamily: fonts.body, fontSize: fontSize.sm + 1, color: colors.muted },

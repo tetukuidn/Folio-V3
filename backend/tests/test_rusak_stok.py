@@ -53,12 +53,15 @@ class TestRusakField:
         assert len(g["belanja"]) == 2
         assert "_id" not in g
 
-    def test_put_without_rusak_defaults_empty(self):
+    def test_put_without_rusak_keeps_existing(self):
+        # Older clients omit `rusak`; existing rusak data must be preserved, not wiped.
+        seed = {"belanja": BELANJA, "rusak": [{"id": "rk1", "tgl": "2026-06-01", "jenis": "x", "jml": 1, "harga": 1, "ket": ""}], "suppliers": [], "pesanan": [], "sender": SENDER}
+        assert requests.put(f"{BASE_URL}/api/data", json=seed, headers=h(API_TOKEN)).status_code == 200
         body = {"belanja": BELANJA, "suppliers": [], "pesanan": [], "sender": SENDER}
         r = requests.put(f"{BASE_URL}/api/data", json=body, headers=h(API_TOKEN))
         assert r.status_code == 200
         g = requests.get(f"{BASE_URL}/api/data", headers=h(API_TOKEN)).json()["data"]
-        assert g["rusak"] == []
+        assert [x["id"] for x in g["rusak"]] == ["rk1"]
 
     def test_rusak_wrong_type_rejected(self):
         body = {"belanja": [], "rusak": "notalist", "suppliers": [], "pesanan": [], "sender": SENDER}

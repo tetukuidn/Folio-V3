@@ -91,9 +91,12 @@ export async function exportExcel(rows: (string | number)[][]): Promise<string> 
 }
 
 export async function exportSheet(aoa: (string | number)[][], sheetName: string, name: string): Promise<string> {
-  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  return exportBook([{ name: sheetName, aoa }], name);
+}
+
+export async function exportBook(sheets: { name: string; aoa: (string | number)[][] }[], name: string): Promise<string> {
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+  for (const s of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.aoa), s.name);
   if (Platform.OS === "web") {
     XLSX.writeFile(wb, name);
     return name;

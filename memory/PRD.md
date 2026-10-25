@@ -84,3 +84,12 @@ Backend 13/13 pytest (`/app/backend/tests/test_lpm_backend.py`), frontend e2e lu
 
 ## Bottom menu redesign (June 2026)
 - Floating tab bar: navy pill (navBar), outline icons grid/document/people/download, mint active (navActive), grey idle, rounded-square mint FAB with glow centered in bar. Ekspor tab label → "Backup". Verified via screenshot (all tabs + FAB navigate, fits at 340px).
+
+## Reseller feature (June 2026)
+- Data (app_data per user): resellers[], pesananReseller[] (Pesanan + resellerId/resellerNama, items snapshot hpp/harga/hargaNormal), returReseller[]; Belanja.hargaReseller?, Rusak.resellerId?.
+- Stock: Sisa = Masuk + Retur − Terjual utama − Terjual reseller − Rusak (calc.ts stokKeluar/stokRetur/sisaStok/stokFIFO). Pesanan baru blocks save when stock insufficient.
+- /reseller screen (Dashboard card under Supplier): today summary, finance (omzet/modal/laba/margin, per-jenis margin reseller vs utama), pesanan & keluar, kelola reseller (add/edit/delete w/ confirm, nonaktif if has trx), retur & rusak forms, history with filters + edit/delete.
+- Pesanan baru: Reseller toggle above Rekapan (searchable picker, auto price from hargaReseller→jual, margin & selisih per item, total margin, below-HPP confirm).
+- Stok barang: Harga Reseller in edit sheet with margins; reseller badge on items; source filter (utama/reseller) + retur cards.
+- Ekspor: "Unduh data reseller (.xlsx)" multi-sheet. Reset clears reseller data.
+- Tests: backend/tests/test_reseller.py. Run suite with -n 0 (parallel runs collide on shared test tokens).

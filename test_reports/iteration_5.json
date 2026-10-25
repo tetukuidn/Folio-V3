@@ -1,0 +1,41 @@
+{
+  "summary": "Reseller feature tested end-to-end (backend pytest -n 0: 34/34 pass; Playwright at 390x844 on the Expo web preview using test_dash_ui_token plus test_dash_reset_token for the reset test). Verified: buka-reseller card sits directly below buka-supplier. Adding 2 resellers works, and duplicate names are rejected regardless of case on both add and edit. Edit, delete with confirm (no transactions) and nonaktif (with transactions) all work, and nonaktif resellers are hidden from the Pesanan baru picker. Harga Reseller calc in the Stok barang edit sheet is correct (7500 vs HPP 5000 / jual 9000 shows 33.3% / 44.4% / lebih murah 16.7%), as are 'belum diatur' and the below-HPP warning; the badge shows 'Reseller Rp 7.500 · margin 33%'. Pesanan baru: toggle sits above Rekapan, price is prefilled from hargaReseller, item margin text and rekap margin are correct, save without reseller shows reseller-error and is blocked, below-HPP needs a second press to save, and over-stock is blocked in both reseller and main flows. Reseller orders do not show in the Pesanan tab (5 main cards only). Reseller finance math is exact (omzet 26.500, modal 20.000, laba 6.500, margin 24.5%, avg utama 51.0% checked by hand). Retur max is sold − returned (3), and over-max is blocked. Retur raises stock and rusak lowers it (TEST_C 8 → 4 → 6 → 5). History filters semua/jual/retur/rusak and per-reseller filter work. Editing an order (hist-edit) puts its stock back temporarily (sisa 8), and the change saves. Deleting from history (hist-hapus-ya) works. Stok barang source filters work; retur and rusak cards are tagged Reseller with the reseller name. Main Dashboard leaves out reseller data (modal 120.000, pohon keluar 8 = main only), while stok sekarang (7) and stok menipis include reseller movements. unduh-reseller downloads Data_Reseller_*.xlsx with 4 sheets. Reset confirm text mentions reseller, and reset clears all reseller arrays on the server. Main gaps: an old-shape PUT /api/data erases reseller data, and retur-vs-sale consistency is not checked.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/data", "issue": "The spec says old data must not be deleted, but a payload without the new keys (e.g. a stale or old client bundle) defaults them to [] and $sets them, erasing every reseller, pesananReseller and returReseller row. Reproduced: PUT {resellers:[x]} then PUT {pesanan:[],belanja:[]} → GET returns resellers=[]. Fix: only $set fields in payload.model_fields_set (or at least for resellers/pesananReseller/returReseller). data_routes.py:84-105"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Reseller history delete / order edit vs retur", "issue": "Nothing stops a reseller sale from being deleted (hapusHist kind 'jual', reseller.tsx:206-209) or edited down to fewer pohon than were already returned (pesanan-baru.tsx simpan reseller branch ~186-239). The retur then has no matching sale, so stock is inflated by phantom returns (e.g. sold 2 / retur 2, delete the sale → stock +2 from nothing). Deleting a retur can also push sisa negative if that stock was sold again.", "affected_testIDs": ["hist-hapus-ya-{id}", "hist-edit-{id}", "simpan-pesanan"]}
+    ],
+    "design_issues": [
+      {"screen": "Reseller", "issues": ["The btn-retur label 'Retur / Barang masuk' is cut off ('Retur / Baran…') at 390px width when shown next to 'Barang rusak'"]},
+      {"screen": "Pesanan baru", "issues": ["The toggle-reseller Switch touch area is 40x20px, below the 44px minimum", "In reseller mode the user must type 'Total Customer Transfer' by hand; it is not filled from 'Total harga reseller'. Performa Finansial uses the transfer, but margin per jenis uses item prices, so the two can disagree."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_reseller.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "PUT /api/data: stop erasing reseller arrays when the payload leaves them out (use model_fields_set to $set only the keys sent).",
+    "Guard retur consistency: block deleting or editing a reseller sale when that would leave returned > sold for a reseller+jenis (or warn and cascade), and guard deleting a retur when it would make sisa stok negative.",
+    "Optional: in reseller mode, fill input-transfer from the total harga reseller (or warn when they differ).",
+    "Optional: decide whether retur should reduce reseller omzet/modal; today Performa Finansial still counts returned pohon as sold.",
+    "Minor UI: shorten the btn-retur label or stack the two buttons on narrow screens; give the Switch a hitSlop / larger touch area."
+  ],
+  "critical_code_review_comments": [
+    "data_routes.py PUT /api/data replaces every array in full, so a stale client can erase newer data (see backend minor issue).",
+    "reseller.tsx hapusHist and pesanan-baru reseller save do not check retur totals against sold totals.",
+    "Retur records do not change reseller financial metrics; returned items still count in omzet/modal/laba. This needs a business decision.",
+    "reseller.tsx is 560 lines and pesanan-baru.tsx is 635 lines: close to the 700-line limit. stok-barang.tsx is 905 lines and should be split."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (34/34 pytest); backward-compat data-loss issue found manually", "frontend": "~97% (all requested flows pass; 1 data-integrity gap + minor design issues)"},
+  "seed_data_creation": "Created TEST_Res Satu/Dua/Tiga plus reseller orders, retur and rusak on test-dash-ui, and reseller data on test-dash-reset; both were reseeded at the end with python /app/backend/tests/seed_dashboard.py.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use the web URL from EXPO_PUBLIC_BACKEND_URL (frontend/.env has no EXPO_BACKEND_URL key). Set localStorage lpm_session_token=test_dash_ui_token, then wait about 1.5s after the page loads before reading numbers, because the store loads asynchronously. Seed stock: TEST_A sisa 1, TEST_B sisa 1, TEST_C sisa 8 (hpp 5000, jual 9000); use TEST_C for reseller tests. Note that the '[data-testid^=stok-item-]' selector also matches stok-item-count. Picker options use the testID picker-item-{value}.",
+  "rca_of_issue": "Data loss: DataPayload defaults the new fields to empty lists and put_data always $sets all keys, so any client that does not know the new keys erases them."
+}

@@ -1,0 +1,14 @@
+{
+  "summary": "RETEST of the iteration 6 fixes. All of them pass. Backend: pytest tests/ -n 0, 34/34 pass. FIX 1: I loaded /pesanan-baru directly with no app history and saved a reseller order. It went to /dashboard and the form unmounted. pesananReseller went from 2 to 3, so only one order was created. Batal and the header back (screen-back) also go to /dashboard on a direct load. FIX 2: when I opened hist-edit-TEST_pr1 from /reseller, reseller-terpilih showed TEST_Reseller Satu. reseller-ganti and reseller-search were not shown and the toggle was disabled. Saving went back to /reseller and the count stayed the same, so no duplicate. FIX 3: with harga 18000, ongkir 15000 and karantina 5000, tapping the link set transfer to 38000 and the link hid. Switching to COD showed it again; tapping it gave 23000 and it hid again. Switching back to non-COD showed it again, giving 38000. Regression: a normal order from fab-pesanan-baru saved, the page went back to /dashboard, and pesanan went from 5 to 6. Browser back after the save does not reopen the form. Seeds were restored at the end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [], "react_native_issues": []},
+  "test_report_links": ["/app/backend/tests/test_reseller.py", "/app/backend/tests/test_lpm_backend.py", "/app/backend/tests/test_lpm_extra.py", "/app/backend/tests/test_rusak_stok.py", "/app/test_reports/pytest/pytest_results_iter7.xml"],
+  "action_items": [],
+  "critical_code_review_comments": ["Minor: if you open an edit URL directly (pesanan-baru?id=..&src=reseller) with no history, saving goes back to /dashboard and not /reseller. This is acceptable.", "The known toast that overlaps the Simpan button (low priority) is still there and was not retested."],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "seed_dashboard.py + seed_reseller_ui.py were re-run at the end to restore the state",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Token test_dash_ui_token. The backend URL key is EXPO_PUBLIC_BACKEND_URL. Picker options use testID picker-item-{value}. Header back is screen-back. Reseller edit is hist-edit-{id} on /reseller."
+}

@@ -26,6 +26,9 @@ class DataPayload(BaseModel):
     suppliers: List[Dict[str, Any]] = Field(default_factory=list)
     pesanan: List[Dict[str, Any]] = Field(default_factory=list)
     sender: Dict[str, Any] = Field(default_factory=lambda: dict(EMPTY_SENDER))
+    resellers: List[Dict[str, Any]] = Field(default_factory=list)
+    pesananReseller: List[Dict[str, Any]] = Field(default_factory=list)
+    returReseller: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class ProfilPayload(BaseModel):
@@ -45,6 +48,9 @@ def _shape(doc: dict, user: dict) -> dict:
         "suppliers": doc.get("suppliers") or [],
         "pesanan": doc.get("pesanan") or [],
         "sender": doc.get("sender") or dict(EMPTY_SENDER),
+        "resellers": doc.get("resellers") or [],
+        "pesananReseller": doc.get("pesananReseller") or [],
+        "returReseller": doc.get("returReseller") or [],
         "profil": doc.get("profil") or _default_profil(user),
     }
 
@@ -60,6 +66,9 @@ async def get_data(user: dict = Depends(current_user)):
             "suppliers": [],
             "pesanan": [],
             "sender": dict(EMPTY_SENDER),
+            "resellers": [],
+            "pesananReseller": [],
+            "returReseller": [],
             "profil": _default_profil(user),
             "updated_at": datetime.now(timezone.utc),
         }
@@ -74,18 +83,26 @@ async def get_data(user: dict = Depends(current_user)):
 
 @router.put("/data")
 async def put_data(payload: DataPayload, user: dict = Depends(current_user)):
-    if len(payload.pesanan) > 5000 or len(payload.belanja) > 5000 or len(payload.rusak) > 5000:
+    lists = [payload.pesanan, payload.belanja, payload.rusak, payload.resellers,
+             payload.pesananReseller, payload.returReseller, payload.suppliers]
+    if any(len(x) > 5000 for x in lists):
         raise HTTPException(status_code=413, detail="data_too_large")
+    # Old app versions don't send the newer lists: only overwrite those when the client sent them,
+    # so an older client never wipes reseller/rusak data.
+    sent = payload.model_fields_set
+    fields = {
+        "belanja": payload.belanja,
+        "suppliers": payload.suppliers,
+        "pesanan": payload.pesanan,
+        "sender": payload.sender,
+        "updated_at": datetime.now(timezone.utc),
+    }
+    for key in ("rusak", "resellers", "pesananReseller", "returReseller"):
+        if key in sent:
+            fields[key] = getattr(payload, key)
     await db.app_data.update_one(
         {"user_id": user["user_id"]},
-        {"$set": {
-            "belanja": payload.belanja,
-            "rusak": payload.rusak,
-            "suppliers": payload.suppliers,
-            "pesanan": payload.pesanan,
-            "sender": payload.sender,
-            "updated_at": datetime.now(timezone.utc),
-        },
+        {"$set": fields,
          "$setOnInsert": {"user_id": user["user_id"], "profil": _default_profil(user)}},
         upsert=True,
     )

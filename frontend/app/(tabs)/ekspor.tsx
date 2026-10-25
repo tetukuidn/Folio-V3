@@ -7,8 +7,9 @@ import { Button, Card, Field, Input } from "@/src/components/ui";
 import { useToast } from "@/src/components/toast";
 import { useStore } from "@/src/store";
 import { colors, fonts, fontSize, radius, spacing } from "@/src/theme";
-import { exportExcel, HEADERS, missingRequired, REQUIRED_IDX, rowFor, toTSV } from "@/src/utils/excel";
-import { formatTgl } from "@/src/utils/format";
+import { exportBook, exportExcel, HEADERS, missingRequired, REQUIRED_IDX, rowFor, toTSV } from "@/src/utils/excel";
+import { formatTgl, ymd } from "@/src/utils/format";
+import { resellerSheets } from "@/src/utils/reseller";
 
 const COL_WIDTH = 150;
 const MAX_ROWS = 100;
@@ -50,8 +51,17 @@ export default function EksporScreen() {
     try {
       await exportExcel(rows);
       toast.show("File Excel dibuat");
-    } catch (e: any) {
+    } catch {
       toast.show("Gagal membuat file");
+    }
+  }
+
+  async function unduhReseller() {
+    try {
+      await exportBook(resellerSheets(state), `Data_Reseller_${ymd(new Date())}.xlsx`);
+      toast.show("File Excel data reseller dibuat");
+    } catch {
+      toast.show("Gagal membuat file reseller");
     }
   }
 
@@ -162,6 +172,13 @@ export default function EksporScreen() {
 
       <Button title="Unduh Excel (.xlsx)" icon="download-outline" onPress={unduh} testID="unduh-excel" />
       <Button title="Salin untuk Excel" kind="alt" icon="copy-outline" onPress={salinTSV} testID="salin-tsv" />
+      <Button
+        title="Unduh data reseller (.xlsx)"
+        kind="alt"
+        icon="storefront-outline"
+        onPress={unduhReseller}
+        testID="unduh-reseller"
+      />
     </Screen>
   );
 }

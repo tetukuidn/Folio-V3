@@ -268,6 +268,13 @@ export default function DashboardScreen() {
         onPress={() => router.push("/supplier")}
         testID="buka-supplier"
       />
+      <Shortcut
+        icon="storefront-outline"
+        title="Reseller"
+        sub={`${(state.resellers || []).length} reseller · ${(state.pesananReseller || []).length} pesanan`}
+        onPress={() => router.push("/reseller")}
+        testID="buka-reseller"
+      />
 
       <View style={styles.card} testID="performa-finansial">
         <View style={styles.finHead}>
@@ -463,7 +470,7 @@ export default function DashboardScreen() {
               {confirmReset ? (
                 <View style={styles.confirmBox}>
                   <Text style={styles.confirmText}>
-                    Hapus semua data akun ini (stok, pesanan, supplier)? Tindakan ini tidak bisa dibatalkan.
+                    Hapus semua data akun ini (stok, pesanan, supplier, reseller, pesanan & retur reseller)? Tindakan ini tidak bisa dibatalkan.
                   </Text>
                   <View style={{ flexDirection: "row", gap: spacing.sm }}>
                     <Pressable onPress={() => setConfirmReset(false)} style={styles.confirmCancel} testID="reset-batal">
