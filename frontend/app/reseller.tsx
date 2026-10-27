@@ -10,7 +10,7 @@ import type { Reseller, ReturReseller, Rusak } from "@/src/store/types";
 import { colors, fonts, fontSize, radius, spacing } from "@/src/theme";
 import { formatRp, formatTgl, todayISO, uid } from "@/src/utils/format";
 import { hppKeluarFIFO, jenisList, sisaStok } from "@/src/utils/calc";
-import { marginPerJenis, statsOf } from "@/src/utils/reseller";
+import { marginPerJenis, nilaiJual, statsOf } from "@/src/utils/reseller";
 import { normalizeWA } from "@/src/utils/phone";
 
 type Periode = "all" | "7" | "1m" | "3m" | "6m";
@@ -77,7 +77,8 @@ export default function ResellerScreen() {
   );
   const st = statsOf(resOrders);
   const today = statsOf(orders.filter((p) => byRes(p.resellerId) && isToday(p.tgl)));
-  const mpj = useMemo(() => marginPerJenis(resOrders, mainOrders), [resOrders, mainOrders]);
+  const mpj = useMemo(() => marginPerJenis(state, resOrders, mainOrders), [state, resOrders, mainOrders]);
+  const jualRes = useMemo(() => nilaiJual(state, resOrders), [state, resOrders]);
   const returF = returs.filter((r) => byRes(r.resellerId) && inRange(r.tgl));
   const rusakF = rusakRes.filter((r) => byRes(r.resellerId || "") && inRange(r.tgl));
 
@@ -275,25 +276,21 @@ export default function ResellerScreen() {
       {/* 2. Performa finansial */}
       <Card testID="res-performa">
         <Text style={styles.cardTitle}>Performa Finansial Reseller</Text>
-        <Row k="Omzet (harga jual)" v={formatRp(st.omset)} testID="res-omzet" />
-        <Row k="Total modal (HPP)" v={formatRp(st.hpp)} testID="res-modal" />
+        <Row k="Omzet (harga reseller)" v={formatRp(st.omset)} testID="res-omzet" />
+        <Row k="Total harga jual (Stok barang)" v={formatRp(jualRes)} testID="res-modal" />
         <Row k="Laba" v={formatRp(st.laba)} danger={st.laba < 0} testID="res-laba" />
-        <Row k="Margin total" v={`${st.margin.toFixed(1)}%`} danger={st.laba < 0} testID="res-margin" />
+        <Row k="Margin total (omzet − HPP − biaya)" v={`${st.margin.toFixed(1)}%`} danger={st.laba < 0} testID="res-margin" />
         <View style={styles.compare} testID="res-banding">
-          <Text style={styles.compareTitle}>Margin rata-rata (kotor)</Text>
-          <Row k="Reseller" v={`${mpj.avgReseller.toFixed(1)}%`} testID="res-avg-reseller" />
-          <Row k="Penjualan utama" v={`${mpj.avgUtama.toFixed(1)}%`} testID="res-avg-utama" />
+          <Text style={styles.compareTitle}>Margin rata-rata (dari harga jual Stok barang)</Text>
+          <Row k="Reseller dapat" v={mpj.hasReseller ? `${mpj.avgReseller.toFixed(1)}%` : "-"} testID="res-avg-reseller" />
+          <Row k="Penjualan utama" v={mpj.hasUtama ? `${mpj.avgUtama.toFixed(1)}%` : "-"} testID="res-avg-utama" />
           <Text style={styles.muted}>
-            {mpj.rows.length === 0
-              ? "Belum ada penjualan reseller untuk dibandingkan"
-              : mpj.avgUtama - mpj.avgReseller >= 0
-              ? `Margin reseller ${(mpj.avgUtama - mpj.avgReseller).toFixed(1)} poin lebih rendah dari utama`
-              : `Margin reseller ${(mpj.avgReseller - mpj.avgUtama).toFixed(1)} poin lebih tinggi dari utama`}
+            Reseller = (harga jual − harga reseller) ÷ harga jual. Utama = (harga jual − HPP) ÷ harga jual.
           </Text>
         </View>
         <Text style={[styles.compareTitle, { marginTop: spacing.md }]}>Margin % per jenis</Text>
         {mpj.rows.length === 0 ? (
-          <Text style={styles.muted}>Belum ada penjualan reseller</Text>
+          <Text style={styles.muted}>Belum ada penjualan</Text>
         ) : (
           <View testID="res-margin-jenis">
             <View style={[styles.tr, styles.thead]}>
@@ -304,13 +301,15 @@ export default function ResellerScreen() {
             {mpj.rows.map((r) => (
               <View key={r.jenis} style={styles.tr}>
                 <Text style={[styles.td, { flex: 1 }]} numberOfLines={1}>{r.jenis}</Text>
-                <Text style={[styles.td, styles.num, r.reseller < 0 && { color: colors.accent }]}>{r.reseller.toFixed(1)}%</Text>
+                <Text style={[styles.td, styles.num, r.reseller !== null && r.reseller < 0 && { color: colors.accent }]}>
+                  {r.reseller === null ? "-" : `${r.reseller.toFixed(1)}%`}
+                </Text>
                 <Text style={[styles.td, styles.num]}>{r.utama === null ? "-" : `${r.utama.toFixed(1)}%`}</Text>
               </View>
             ))}
           </View>
         )}
-        <Text style={[styles.muted, { marginTop: 6 }]}>Utama dihitung dari harga jual pesanan dibagi per item sesuai porsi HPP.</Text>
+        <Text style={[styles.muted, { marginTop: 6 }]}>Harga jual mengikuti harga terbaru di menu Stok barang. Jenis tanpa harga jual tampil "-".</Text>
       </Card>
 
       {/* Pesanan & barang keluar */}
@@ -320,7 +319,7 @@ export default function ResellerScreen() {
         <Row k="Pohon keluar" v={String(st.pohon)} testID="res-pohon-keluar" />
         <Row k="Pohon retur (masuk)" v={String(retPohon)} testID="res-pohon-retur" />
         <Row k="Pohon rusak" v={String(rusPohon)} testID="res-pohon-rusak" />
-        <Row k="Total HPP keluar" v={formatRp(st.hpp)} />
+        <Row k="Total harga jual keluar" v={formatRp(jualRes)} testID="res-jual-keluar" />
         <Row k="Keuntungan" v={formatRp(st.laba)} danger={st.laba < 0} />
       </Card>
 

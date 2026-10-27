@@ -93,3 +93,7 @@ Backend 13/13 pytest (`/app/backend/tests/test_lpm_backend.py`), frontend e2e lu
 - Stok barang: Harga Reseller in edit sheet with margins; reseller badge on items; source filter (utama/reseller) + retur cards.
 - Ekspor: "Unduh data reseller (.xlsx)" multi-sheet. Reset clears reseller data.
 - Tests: backend/tests/test_reseller.py. Run suite with -n 0 (parallel runs collide on shared test tokens).
+
+## Pesanan source filter + reseller margins from Stok barang price (June 2026)
+- Pesanan tab: chips Semua / Utama / Reseller (pesanan-sumber-*), badge per card (pesanan-badge-{id}), reseller cards red left border; edit/delete/status work for reseller orders (delete blocked if returned).
+- Reseller page: "Total harga jual (Stok barang)" replaces HPP; margin rata-rata Reseller = (jual − harga reseller)/jual, Utama = (jual − HPP)/jual, jual = latest harga jual in Stok barang (hargaJenis).

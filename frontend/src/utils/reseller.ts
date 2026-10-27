@@ -1,5 +1,5 @@
 import type { Pesanan, StoreState } from "../store/types";
-import { hitungRekap, pct } from "./calc";
+import { hargaJenis, hitungRekap, pct } from "./calc";
 
 export function resellerNama(state: StoreState, id?: string): string {
   if (!id) return "";
@@ -30,38 +30,50 @@ export function statsOf(orders: Pesanan[]) {
   return { omset, hpp, laba, transfer, pohon, ongkir, karantina, ops, jml: orders.length, margin: pct(laba, omset) };
 }
 
-// Margin kotor % per jenis: reseller (harga item) vs utama (omset dibagi per item sesuai porsi HPP)
-export function marginPerJenis(resellerOrders: Pesanan[], mainOrders: Pesanan[]) {
-  const r: Record<string, { jual: number; hpp: number }> = {};
+// Margin % per jenis, memakai harga jual di Stok barang (harga terbaru):
+// - Reseller dapat = (harga jual − harga reseller) / harga jual
+// - Utama          = (harga jual − HPP) / harga jual
+export function marginPerJenis(state: StoreState, resellerOrders: Pesanan[], mainOrders: Pesanan[]) {
+  const r: Record<string, { jual: number; beli: number }> = {};
   const m: Record<string, { jual: number; hpp: number }> = {};
   for (const p of resellerOrders)
     for (const it of p.items) {
-      const x = (r[it.jenis] ||= { jual: 0, hpp: 0 });
-      x.jual += (it.harga || 0) * it.jml;
+      const jual = hargaJenis(state, it.jenis).jual || it.hargaNormal || 0;
+      if (jual <= 0) continue; // harga jual belum diatur: tidak dihitung
+      const x = (r[it.jenis] ||= { jual: 0, beli: 0 });
+      x.jual += jual * it.jml;
+      x.beli += (it.harga || 0) * it.jml;
+    }
+  for (const p of mainOrders)
+    for (const it of p.items) {
+      const jual = hargaJenis(state, it.jenis).jual;
+      if (jual <= 0) continue; // harga jual belum diatur: tidak dihitung
+      const x = (m[it.jenis] ||= { jual: 0, hpp: 0 });
+      x.jual += jual * it.jml;
       x.hpp += it.hpp * it.jml;
     }
-  for (const p of mainOrders) {
-    const { omset, totalHpp } = hitungRekap(p);
-    if (totalHpp <= 0) continue;
-    for (const it of p.items) {
-      const h = it.hpp * it.jml;
-      const x = (m[it.jenis] ||= { jual: 0, hpp: 0 });
-      x.jual += (omset * h) / totalHpp;
-      x.hpp += h;
-    }
-  }
-  const sum = (o: Record<string, { jual: number; hpp: number }>) =>
-    Object.values(o).reduce((a, x) => ({ jual: a.jual + x.jual, hpp: a.hpp + x.hpp }), { jual: 0, hpp: 0 });
-  const rows = Object.keys(r)
+  const rs = Object.values(r).reduce((a, x) => ({ jual: a.jual + x.jual, beli: a.beli + x.beli }), { jual: 0, beli: 0 });
+  const ms = Object.values(m).reduce((a, x) => ({ jual: a.jual + x.jual, hpp: a.hpp + x.hpp }), { jual: 0, hpp: 0 });
+  const rows = Array.from(new Set([...Object.keys(r), ...Object.keys(m)]))
     .sort()
     .map((jenis) => ({
       jenis,
-      reseller: pct(r[jenis].jual - r[jenis].hpp, r[jenis].jual),
+      reseller: r[jenis] ? pct(r[jenis].jual - r[jenis].beli, r[jenis].jual) : null,
       utama: m[jenis] ? pct(m[jenis].jual - m[jenis].hpp, m[jenis].jual) : null,
     }));
-  const rs = sum(r);
-  const ms = sum(m);
-  return { rows, avgReseller: pct(rs.jual - rs.hpp, rs.jual), avgUtama: pct(ms.jual - ms.hpp, ms.jual) };
+  return {
+    rows,
+    avgReseller: pct(rs.jual - rs.beli, rs.jual),
+    avgUtama: pct(ms.jual - ms.hpp, ms.jual),
+    totalJualReseller: rs.jual,
+    hasReseller: rs.jual > 0,
+    hasUtama: ms.jual > 0,
+  };
+}
+
+// Total nilai harga jual (Stok barang) dari barang di pesanan
+export function nilaiJual(state: StoreState, orders: Pesanan[]): number {
+  return orders.reduce((a, p) => a + p.items.reduce((x, it) => x + (hargaJenis(state, it.jenis).jual || it.hargaNormal || 0) * it.jml, 0), 0);
 }
 
 // Sheet terpisah untuk ekspor/backup data reseller

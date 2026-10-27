@@ -1,0 +1,35 @@
+{
+  "summary": "Frontend test of the Pesanan Utama/Reseller tabs and the new Reseller margin numbers. Viewport 375x667, token test_dash_ui_token. The chips show the right counts: Semua (7), Utama (5), Reseller (2). Semua lists both sources sorted by date, newest first. Utama shows only main orders and Reseller shows only reseller orders. Badges read 'Utama' or 'Reseller · TEST_Reseller Satu'. Reseller cards have a 4px red left border (rgb 196,47,92). Searching 'reseller satu' or 'utama' filters correctly. BUG FOUND AND FIXED: tapping status-chip-{id} did nothing on any card, main or reseller. Cause: Chip renders its own Pressable (with no onPress) inside the card's Pressable, and the inner one takes the tap. I passed onPress straight to Chip. After the fix, the status flips Dikirim <-> Problem on both card types and the change reaches pesananReseller in the backend. Delete: blocked with the 'sudah diretur' toast when the jenis was already returned. With the return set to 2, the delete works, counts drop to Reseller (1) / Semua (6), and the backend matches. Ubah on a reseller card opens /pesanan-baru?id=..&src=reseller with the reseller locked (no reseller-ganti or reseller-search). Saving returns to /pesanan with no duplicate. Main edit save is unchanged: it returns to /pesanan and keeps 5 orders. /reseller numbers all match my hand calculations. All period: res-modal and res-jual-keluar Rp 100.000, res-avg-reseller 20.0%, res-avg-utama 53.8%. Per jenis: TEST_A 20.0% / 60.0%, TEST_B - / 50.0%. Utama by period: 7 hari 55.6%, 1 bulan 56.5%, 6 bulan 53.2%. After changing TEST_A harga jual from 25000 to 30000 in the Stok barang edit sheet: Rp 120.000, 33.3%, 57.1%, and TEST_A 33.3% / 66.7%. The Dashboard loads normally. One open bug: when a jenis has no harga jual in Stok barang (jual = 0), the margin averages come out wrong. Seeds were restored at the end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PesananCard status chip", "issue": "FIXED by testing agent. Tapping the status chip did not toggle it, on main or reseller cards. Chip (src/components/ui.tsx:88) always renders a Pressable, even when it has no onPress. Nested inside the card's Pressable, it takes the tap, so the outer onPress never ran. Fix: pass onPress to Chip directly (pesanan.tsx:180).", "testID": "status-chip-{id}", "priority": "HIGH"},
+      {"component": "marginPerJenis (src/utils/reseller.ts:46-60)", "issue": "Items whose jenis has no harga jual in Stok barang still count. jual is 0 but HPP (or the reseller price) is still added, which drags the average down. Reproduced: TEST_B jual = 0 made res-avg-utama show 0.0% when it should be 66.7% (TEST_A only), and the TEST_B row showed '0.0%' instead of '-'. The reseller side does the same when there is no jual and no hargaNormal.", "testID": "res-avg-utama", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Pesanan tab", "issues": ["The status chip is about 73x29px, under the 44px touch target. The old wrapper's hitSlop is gone after the fix, so consider minHeight 44 or hitSlop on Chip.", "On reseller cards with an empty kurir (PICKUP), the meta line reads ' · 1 kg' with a leading separator."]},
+      {"screen": "Stok barang edit sheet", "issues": ["The Harga jual input (edit-jual) runs past the right edge of the screen at 375px when focused, next to the HPP input."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/patch_data_helper.py"],
+  "action_items": [
+    "In marginPerJenis, skip items where hargaJenis(...).jual (and the hargaNormal fallback) is 0. Leave them out of both jual and hpp/beli so the average is not dragged down, and show '-' or 'harga jual belum diatur' for that jenis.",
+    "Consider having Chip render a plain View when onPress is undefined, so no other nested-Pressable taps get swallowed.",
+    "Give status-chip a 44px touch target with minHeight or hitSlop.",
+    "Minor: hide the leading ' · ' when kurir is empty on the Pesanan card."
+  ],
+  "critical_code_review_comments": [
+    "pesanan.tsx: openDetail is keyed by p.id alone. A main order and a reseller order with the same id would open together. Key it by source + id, as the card key already is.",
+    "Deleting a reseller or main order from the Pesanan tab has no confirmation step. This was already the case before.",
+    "Saving a reseller order whose kurir was empty fills in the default kurir (Lion Parcel · Reguler). This is form-default behaviour, noted only.",
+    "On /reseller, Laba and Margin total still use HPP (omzet − HPP = 50%), while 'Reseller dapat' uses harga jual (20%). The two numbers next to each other may confuse users, so consider clearer labels."
+  ],
+  "updated_files": ["/app/frontend/app/(tabs)/pesanan.tsx", "/app/backend/tests/patch_data_helper.py"],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "92% (1 bug fixed, 1 margin edge-case bug open)"},
+  "seed_data_creation": "seed_reseller_ui.py was re-run at the end (it also runs seed_dashboard.py). Harga jual is back to 25000/40000/9000 and returReseller is back to 4.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Token test_dash_ui_token, backend URL key EXPO_PUBLIC_BACKEND_URL. patch_data_helper.py actions: show, retur2, jual:<belanjaId>:<val>. Seeded main orders have no wa/alamat/kota/kec, so editing one needs those fields filled before saving. Stok edit: stok-edit-{id} -> edit-jual -> edit-simpan; scroll edit-simpan into view with JS first. Expected numbers with the seed (all period): res-modal 100.000, reseller 20.0%, utama 53.8%."
+}
