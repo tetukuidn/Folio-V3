@@ -8,10 +8,10 @@ import { Button, Card, Chip, Input } from "@/src/components/ui";
 import { Rekapan } from "@/src/components/rekapan";
 import { useToast } from "@/src/components/toast";
 import { useStore } from "@/src/store";
-import type { Pesanan, StatusPesanan } from "@/src/store/types";
+import type { Pesanan, PesananItem, StatusPesanan } from "@/src/store/types";
 import { colors, fonts, fontSize, radius, spacing } from "@/src/theme";
 import { formatRp, formatTgl } from "@/src/utils/format";
-import { hitungRekap } from "@/src/utils/calc";
+import { hargaJenis, hitungRekap } from "@/src/utils/calc";
 import { displayWA, normalizeWA } from "@/src/utils/phone";
 
 export default function PesananScreen() {
@@ -133,6 +133,7 @@ export default function PesananScreen() {
           onEdit={() => router.push({ pathname: "/pesanan-baru", params: res ? { id: p.id, src: "reseller" } : { id: p.id } })}
           onDelete={() => (res ? hapusRes(p.id) : hapus(p.id))}
           onChat={() => chatWA(p.wa)}
+          jualOf={(it) => hargaJenis(state, it.jenis).jual || it.hargaNormal || 0}
         />
       ))}
     </Screen>
@@ -148,9 +149,11 @@ function PesananCard({
   onEdit,
   onDelete,
   onChat,
+  jualOf,
 }: {
   p: Pesanan;
   reseller?: string;
+  jualOf: (it: PesananItem) => number;
   open: boolean;
   onToggleOpen: () => void;
   onToggleStatus: () => void;
@@ -159,6 +162,9 @@ function PesananCard({
   onChat: () => void;
 }) {
   const rek = hitungRekap(p);
+  const jualStok = p.items.reduce((a, it) => a + jualOf(it) * it.jml, 0);
+  // Keuntungan = Transfer − ongkir − karantina − operasional − harga jual (Stok barang)
+  const keuntungan = rek.totalTransfer - rek.og - (p.karantina || 0) - (p.ops || 0) - jualStok;
   return (
     <Card testID={`pesanan-card-${p.id}`} style={reseller ? styles.cardReseller : undefined}>
       <View style={[styles.srcBadge, reseller ? styles.srcBadgeRes : styles.srcBadgeUtama]} testID={`pesanan-badge-${p.id}`}>
@@ -201,12 +207,12 @@ function PesananCard({
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.muted}>Keuntungan</Text>
           <Text
-            style={[styles.money, rek.keuntungan < 0 && { color: colors.accent }]}
+            style={[styles.money, keuntungan < 0 && { color: colors.accent }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
           >
-            {formatRp(rek.keuntungan)}
+            {formatRp(keuntungan)}
           </Text>
         </View>
       </View>
@@ -240,7 +246,7 @@ function PesananCard({
           </DetailBlock>
           <DetailBlock title="Pesanan">
             {p.items.map((it) => (
-              <DetailRow key={it.jenis} k={it.jenis} v={`${it.jml} pohon · HPP ${formatRp(it.hpp)}`} />
+              <DetailRow key={it.jenis} k={it.jenis} v={`${it.jml} pohon · Harga jual ${formatRp(jualOf(it))}`} />
             ))}
           </DetailBlock>
           <DetailBlock title="Pengiriman">
@@ -256,6 +262,7 @@ function PesananCard({
               ops={p.ops}
               hpp={rek.totalHpp}
               codOngkir={p.codOngkir}
+              hargaJualStok={jualStok}
             />
           </DetailBlock>
           <Pressable onPress={onDelete} style={{ alignSelf: "flex-start", marginTop: 4, minHeight: 44, justifyContent: "center" }}>

@@ -97,3 +97,7 @@ Backend 13/13 pytest (`/app/backend/tests/test_lpm_backend.py`), frontend e2e lu
 ## Pesanan source filter + reseller margins from Stok barang price (June 2026)
 - Pesanan tab: chips Semua / Utama / Reseller (pesanan-sumber-*), badge per card (pesanan-badge-{id}), reseller cards red left border; edit/delete/status work for reseller orders (delete blocked if returned).
 - Reseller page: "Total harga jual (Stok barang)" replaces HPP; margin rata-rata Reseller = (jual − harga reseller)/jual, Utama = (jual − HPP)/jual, jual = latest harga jual in Stok barang (hargaJenis).
+
+## Pesanan tab: harga jual instead of HPP (June 2026)
+- Pesanan card detail + Rekapan show "Harga jual (Stok barang)" (latest jual per jenis × jml) instead of Total HPP.
+- Keuntungan in Pesanan tab cards and Reseller "Ringkasan hari ini" = Transfer − ongkir − karantina − operasional − harga jual (Stok barang). Dashboard & other reports unchanged (still HPP-based).

@@ -10,6 +10,7 @@ export function Rekapan({
   ops,
   hpp,
   codOngkir,
+  hargaJualStok,
 }: {
   transfer: number;
   ongkir: number;
@@ -17,12 +18,16 @@ export function Rekapan({
   ops: number;
   hpp: number;
   codOngkir: boolean;
+  // Jika diisi, baris "Total HPP" ditampilkan sebagai harga jual dari Stok barang (hitungan keuntungan tetap)
+  hargaJualStok?: number;
 }) {
   const og = codOngkir ? 0 : ongkir;
   const hargaJual = transfer - karantina - og;
-  const keuntungan = hargaJual - hpp - ops;
+  // Dengan harga jual Stok barang: Keuntungan = Transfer − ongkir − karantina − operasional − harga jual
+  const pengurang = hargaJualStok === undefined ? hpp : hargaJualStok;
+  const keuntungan = hargaJual - pengurang - ops;
   const kiri = transfer - og - karantina - ops;
-  const kanan = hpp + keuntungan;
+  const kanan = pengurang + keuntungan;
   const sesuai = Math.round(kiri) === Math.round(kanan);
   return (
     <View>
@@ -30,10 +35,16 @@ export function Rekapan({
       <RRow label="− Ongkir" val={-og} />
       <RRow label="− Biaya karantina" val={-karantina} />
       <RRow label="= Harga jual" val={hargaJual} bold />
-      <RRow label="− Total HPP" val={-hpp} />
+      {hargaJualStok === undefined ? (
+        <RRow label="− Total HPP" val={-hpp} />
+      ) : (
+        <RRow label="− Harga jual (Stok barang)" val={-hargaJualStok} />
+      )}
       <RRow label="− Biaya operasional" val={-ops} />
       <RRow label="= Keuntungan" val={keuntungan} bold danger={keuntungan < 0} />
-      <Text style={styles.muted}>Cek: Transfer − ongkir − karantina − operasional = HPP + Keuntungan</Text>
+      <Text style={styles.muted}>
+        Cek: Transfer − ongkir − karantina − operasional = {hargaJualStok === undefined ? "HPP" : "Harga jual"} + Keuntungan
+      </Text>
       <Text style={[styles.flag, { color: sesuai ? colors.brandPrimary : colors.accent }]}>
         {sesuai ? "Sesuai" : "Tidak sesuai"}
       </Text>

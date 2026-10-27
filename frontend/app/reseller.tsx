@@ -76,7 +76,11 @@ export default function ResellerScreen() {
     [state.pesanan, periode]
   );
   const st = statsOf(resOrders);
-  const today = statsOf(orders.filter((p) => byRes(p.resellerId) && isToday(p.tgl)));
+  const todayOrders = orders.filter((p) => byRes(p.resellerId) && isToday(p.tgl));
+  const today = statsOf(todayOrders);
+  const jualToday = nilaiJual(state, todayOrders);
+  // Keuntungan hari ini = Transfer − ongkir − karantina − operasional − harga jual (Stok barang)
+  const untungToday = today.transfer - today.ongkir - today.karantina - today.ops - jualToday;
   const mpj = useMemo(() => marginPerJenis(state, resOrders, mainOrders), [state, resOrders, mainOrders]);
   const jualRes = useMemo(() => nilaiJual(state, resOrders), [state, resOrders]);
   const returF = returs.filter((r) => byRes(r.resellerId) && inRange(r.tgl));
@@ -267,10 +271,13 @@ export default function ResellerScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.heroLbl}>Keuntungan</Text>
-            <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit testID="res-hari-untung">{formatRp(today.laba)}</Text>
+            <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit testID="res-hari-untung">{formatRp(untungToday)}</Text>
           </View>
         </View>
         <Text style={[styles.heroLbl, { marginTop: spacing.sm }]}>{today.jml} pesanan · {today.pohon} pohon keluar</Text>
+        <Text style={[styles.heroLbl, { marginTop: 4 }]} testID="res-hari-harga-jual">
+          Harga jual (Stok barang): {formatRp(jualToday)}
+        </Text>
       </View>
 
       {/* 2. Performa finansial */}

@@ -9,14 +9,14 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.plantsaleslogger.j5mv0z"
+      "bundleIdentifier": "com.mengakar.folio"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#11C87C"
       },
-      "package": "com.emergent.plantsaleslogger.j5mv0z"
+      "package": "com.mengakar.folio"
     },
     "web": {
       "bundler": "metro",
