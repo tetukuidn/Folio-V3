@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -14,21 +15,21 @@ import { pct } from "@/src/utils/calc";
 import { nilaiJual, statsOf } from "@/src/utils/reseller";
 import { normalizeWA } from "@/src/utils/phone";
 
-type Periode = "all" | "7" | "1m" | "3m" | "6m";
+type Periode = "all" | "7" | "1m" | "3m" | "range";
 
 const PERIODE: { k: Periode; l: string }[] = [
   { k: "all", l: "Semua" },
   { k: "7", l: "7 hari" },
   { k: "1m", l: "1 bulan" },
   { k: "3m", l: "3 bulan" },
-  { k: "6m", l: "6 bulan" },
+  { k: "range", l: "Pilih tanggal" },
 ];
 
 function startOf(p: Periode): number | null {
-  if (p === "all") return null;
+  if (p === "all" || p === "range") return null;
   const d = new Date();
   if (p === "7") d.setDate(d.getDate() - 7);
-  else d.setMonth(d.getMonth() - (p === "1m" ? 1 : p === "3m" ? 3 : 6));
+  else d.setMonth(d.getMonth() - (p === "1m" ? 1 : 3));
   return d.getTime();
 }
 
@@ -39,6 +40,14 @@ export default function ResellerScreen() {
   const toast = useToast();
   const router = useRouter();
   const [periode, setPeriode] = useState<Periode>("all");
+  const [dari, setDari] = useState<Date>(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d;
+  });
+  const [sampai, setSampai] = useState<Date>(() => new Date());
+  const [showDari, setShowDari] = useState(false);
+  const [showSampai, setShowSampai] = useState(false);
   const [filterRes, setFilterRes] = useState("");
   const [kelola, setKelola] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -53,13 +62,21 @@ export default function ResellerScreen() {
   const rusakRes = (state.rusak || []).filter((r) => r.resellerId);
 
   const start = startOf(periode);
-  const inRange = (tgl: string) => start === null || new Date(tgl).getTime() >= start;
+  const inRange = (tgl: string) => {
+    const t = new Date(tgl).getTime();
+    if (periode === "range") {
+      const a = new Date(dari).setHours(0, 0, 0, 0);
+      const b = new Date(sampai).setHours(23, 59, 59, 999);
+      return t >= a && t <= b;
+    }
+    return start === null || t >= start;
+  };
   const byRes = (id: string) => !filterRes || id === filterRes;
 
   const resOrders = useMemo(
     () => orders.filter((p) => byRes(p.resellerId) && inRange(p.tgl)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orders, filterRes, periode]
+    [orders, filterRes, periode, dari, sampai]
   );
   const st = statsOf(resOrders);
   const todayOrders = orders.filter((p) => byRes(p.resellerId) && isToday(p.tgl));
@@ -156,6 +173,38 @@ export default function ResellerScreen() {
           <ChipBtn key={p.k} label={p.l} active={periode === p.k} onPress={() => setPeriode(p.k)} testID={`res-periode-${p.k}`} />
         ))}
       </ScrollView>
+      {periode === "range" && (
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <Pressable onPress={() => setShowDari(true)} style={styles.dateBtn} testID="res-tanggal-dari">
+            <Text style={styles.dateLbl}>Dari</Text>
+            <Text style={styles.dateVal} numberOfLines={1}>{formatTgl(dari.toISOString())}</Text>
+          </Pressable>
+          <Pressable onPress={() => setShowSampai(true)} style={styles.dateBtn} testID="res-tanggal-sampai">
+            <Text style={styles.dateLbl}>Sampai</Text>
+            <Text style={styles.dateVal} numberOfLines={1}>{formatTgl(sampai.toISOString())}</Text>
+          </Pressable>
+          {showDari && (
+            <DateTimePicker
+              value={dari}
+              mode="date"
+              onChange={(_, d) => {
+                setShowDari(Platform.OS === "ios");
+                if (d) setDari(d);
+              }}
+            />
+          )}
+          {showSampai && (
+            <DateTimePicker
+              value={sampai}
+              mode="date"
+              onChange={(_, d) => {
+                setShowSampai(Platform.OS === "ios");
+                if (d) setSampai(d);
+              }}
+            />
+          )}
+        </View>
+      )}
 
       {/* 1. Ringkasan hari ini (data dari Performa Finansial Reseller) */}
       <LinearGradient
@@ -476,4 +525,15 @@ const styles = StyleSheet.create({
   confirm: { marginTop: spacing.sm, padding: spacing.md, borderRadius: 14, backgroundColor: colors.accentMuted, gap: spacing.sm },
   confirmText: { fontFamily: fonts.medium, fontSize: fontSize.sm + 1, color: colors.onAccentMuted },
   btnRow: { flexDirection: "row", gap: spacing.sm },
+  dateBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    padding: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  dateLbl: { fontFamily: fonts.medium, color: colors.muted, fontSize: 11 },
+  dateVal: { fontFamily: fonts.semibold, color: colors.onSurface, fontSize: fontSize.base },
 });
