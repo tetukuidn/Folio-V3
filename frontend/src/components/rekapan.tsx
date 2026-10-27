@@ -11,6 +11,8 @@ export function Rekapan({
   hpp,
   codOngkir,
   hargaJualStok,
+  jualLabel = "Harga jual (Stok barang)",
+  hideHargaJual,
 }: {
   transfer: number;
   ongkir: number;
@@ -20,6 +22,8 @@ export function Rekapan({
   codOngkir: boolean;
   // Jika diisi, baris "Total HPP" ditampilkan sebagai harga jual dari Stok barang (hitungan keuntungan tetap)
   hargaJualStok?: number;
+  jualLabel?: string;
+  hideHargaJual?: boolean;
 }) {
   const og = codOngkir ? 0 : ongkir;
   const hargaJual = transfer - karantina - og;
@@ -34,16 +38,16 @@ export function Rekapan({
       <RRow label="Total Customer Transfer" val={transfer} />
       <RRow label="− Ongkir" val={-og} />
       <RRow label="− Biaya karantina" val={-karantina} />
-      <RRow label="= Harga jual" val={hargaJual} bold />
+      {!hideHargaJual && <RRow label="= Harga jual" val={hargaJual} bold />}
       {hargaJualStok === undefined ? (
         <RRow label="− Total HPP" val={-hpp} />
       ) : (
-        <RRow label="− Harga jual (Stok barang)" val={-hargaJualStok} />
+        <RRow label={`− ${jualLabel}`} val={-hargaJualStok} />
       )}
       <RRow label="− Biaya operasional" val={-ops} />
       <RRow label="= Keuntungan" val={keuntungan} bold danger={keuntungan < 0} />
       <Text style={styles.muted}>
-        Cek: Transfer − ongkir − karantina − operasional = {hargaJualStok === undefined ? "HPP" : "Harga jual"} + Keuntungan
+        Cek: Transfer − ongkir − karantina − operasional = {hargaJualStok === undefined ? "HPP" : jualLabel.replace(" (Stok barang)", "")} + Keuntungan
       </Text>
       <Text style={[styles.flag, { color: sesuai ? colors.brandPrimary : colors.accent }]}>
         {sesuai ? "Sesuai" : "Tidak sesuai"}

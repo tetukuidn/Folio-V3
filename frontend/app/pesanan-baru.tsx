@@ -142,6 +142,8 @@ export default function PesananBaruScreen() {
   const belowHpp = resellerOn && form.items.some((it) => it.jml > 0 && (it.harga || 0) < it.hpp);
 
   const totalHppForm = form.items.reduce((a, it) => a + it.hpp * it.jml, 0);
+  // Harga reseller di Rekapan = harga jual dari Stok barang × jumlah
+  const totalJualStokForm = form.items.reduce((a, it) => a + hargaJenis(stokState, it.jenis).jual * it.jml, 0);
   const transferN = Number(form.transfer) || 0;
   const ongkirN = Number(form.ongkir) || 0;
   const karN = Number(form.karantina) || 0;
@@ -471,8 +473,8 @@ export default function PesananBaruScreen() {
         <Divider />
         <SectionTitle n={3} title="Biaya & transfer" />
         <View style={styles.rowRead}>
-          <Text style={styles.muted}>HPP global</Text>
-          <Text style={styles.readVal}>{formatRp(totalHppForm)}</Text>
+          <Text style={styles.muted}>Harga Reseller</Text>
+          <Text style={styles.readVal}>{formatRp(totalJualStokForm)}</Text>
         </View>
         <Field label="Ongkir (dibayar pembeli)">
           <Input value={form.ongkir} onChangeText={(v) => patchForm({ ongkir: v })} keyboardType="number-pad" testID="input-ongkir" />
@@ -591,6 +593,9 @@ export default function PesananBaruScreen() {
           ops={opsN}
           hpp={totalHppForm}
           codOngkir={form.codOngkir}
+          hargaJualStok={totalJualStokForm}
+          jualLabel="Harga reseller"
+          hideHargaJual
         />
         {resellerOn && (
           <View style={{ marginTop: spacing.sm }} testID="rekap-reseller">
