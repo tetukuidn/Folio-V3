@@ -138,7 +138,6 @@ export default function PesananBaruScreen() {
   }
 
   const totalJualReseller = form.items.reduce((a, it) => a + (it.harga || 0) * it.jml, 0);
-  const marginPesanan = pct(totalJualReseller - form.items.reduce((a, it) => a + it.hpp * it.jml, 0), totalJualReseller);
   const belowHpp = resellerOn && form.items.some((it) => it.jml > 0 && (it.harga || 0) < it.hpp);
 
   const totalHppForm = form.items.reduce((a, it) => a + it.hpp * it.jml, 0);
@@ -477,8 +476,8 @@ export default function PesananBaruScreen() {
         <Divider />
         <SectionTitle n={3} title="Biaya & transfer" />
         <View style={styles.rowRead}>
-          <Text style={styles.muted}>Harga Reseller</Text>
-          <Text style={styles.readVal}>{formatRp(totalJualStokForm)}</Text>
+          <Text style={styles.muted}>{resellerOn ? "Harga Reseller" : "HPP"}</Text>
+          <Text style={styles.readVal}>{formatRp(resellerOn ? totalJualStokForm : totalHppForm)}</Text>
         </View>
         <Field label="Ongkir (dibayar pembeli)">
           <Input value={form.ongkir} onChangeText={(v) => patchForm({ ongkir: v })} keyboardType="number-pad" testID="input-ongkir" />
@@ -597,8 +596,9 @@ export default function PesananBaruScreen() {
           ops={opsN}
           hpp={totalHppForm}
           codOngkir={form.codOngkir}
-          hargaJualStok={totalHppForm}
-          jualLabel="HPP"
+          hargaJualStok={resellerOn ? totalJualStokForm : totalHppForm}
+          jualLabel={resellerOn ? "Harga Reseller" : "HPP"}
+          jualAtTop={resellerOn}
           hideHargaJual
         />
         {resellerOn && (
@@ -606,21 +606,6 @@ export default function PesananBaruScreen() {
             <View style={styles.rowRead}>
               <Text style={styles.muted}>Total harga reseller</Text>
               <Text style={styles.readVal}>{formatRp(totalJualReseller)}</Text>
-            </View>
-            {totalJualReseller > 0 && transferN !== totalJualReseller + (form.codOngkir ? 0 : ongkirN) + karN && (
-              <Pressable
-                onPress={() => patchForm({ transfer: String(totalJualReseller + (form.codOngkir ? 0 : ongkirN) + karN) })}
-                style={{ minHeight: 40, justifyContent: "center" }}
-                testID="pakai-harga-reseller"
-              >
-                <Text style={styles.linkPrimary}>Isi total transfer dari harga reseller (+ ongkir & karantina)</Text>
-              </Pressable>
-            )}
-            <View style={styles.rowRead}>
-              <Text style={styles.muted}>Total margin pesanan</Text>
-              <Text style={[styles.readVal, marginPesanan < 0 && { color: colors.accent }]} testID="rekap-margin-total">
-                {marginPesanan.toFixed(1)}%
-              </Text>
             </View>
             {belowHpp && (
               <Text style={styles.warn} testID="warn-below-hpp">

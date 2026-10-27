@@ -1,21 +1,20 @@
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Screen } from "@/src/components/screen";
 import { Button, Card, Field, Input } from "@/src/components/ui";
 import { useToast } from "@/src/components/toast";
 import { useStore } from "@/src/store";
-import type { Reseller, ReturReseller, Rusak } from "@/src/store/types";
-import { colors, fonts, fontSize, radius, spacing } from "@/src/theme";
-import { formatRp, formatTgl, todayISO, uid } from "@/src/utils/format";
-import { hppKeluarFIFO, jenisList, sisaStok } from "@/src/utils/calc";
-import { marginPerJenis, nilaiJual, statsOf } from "@/src/utils/reseller";
+import type { Reseller } from "@/src/store/types";
+import { colors, fonts, fontSize, radius, shadow, spacing } from "@/src/theme";
+import { formatRp, formatTgl, uid } from "@/src/utils/format";
+import { pct } from "@/src/utils/calc";
+import { nilaiJual, statsOf } from "@/src/utils/reseller";
 import { normalizeWA } from "@/src/utils/phone";
 
 type Periode = "all" | "7" | "1m" | "3m" | "6m";
-type Hist = "semua" | "jual" | "retur" | "rusak";
-type Mode = "retur" | "rusak" | null;
 
 const PERIODE: { k: Periode; l: string }[] = [
   { k: "all", l: "Semua" },
@@ -41,25 +40,17 @@ export default function ResellerScreen() {
   const router = useRouter();
   const [periode, setPeriode] = useState<Periode>("all");
   const [filterRes, setFilterRes] = useState("");
-  const [hist, setHist] = useState<Hist>("semua");
   const [kelola, setKelola] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [nama, setNama] = useState("");
   const [hp, setHp] = useState("");
   const [cat, setCat] = useState("");
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
-  const [confirmHist, setConfirmHist] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>(null);
-  const [mRes, setMRes] = useState("");
-  const [mJenis, setMJenis] = useState("");
-  const [mJml, setMJml] = useState("");
-  const [mKet, setMKet] = useState("");
 
   const resellers = state.resellers || [];
   const orders = state.pesananReseller || [];
   const returs = state.returReseller || [];
   const rusakRes = (state.rusak || []).filter((r) => r.resellerId);
-  const nameOf = (id?: string) => resellers.find((r) => r.id === id)?.nama || "Reseller";
 
   const start = startOf(periode);
   const inRange = (tgl: string) => start === null || new Date(tgl).getTime() >= start;
@@ -70,19 +61,15 @@ export default function ResellerScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [orders, filterRes, periode]
   );
-  const mainOrders = useMemo(
-    () => state.pesanan.filter((p) => inRange(p.tgl)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.pesanan, periode]
-  );
   const st = statsOf(resOrders);
   const todayOrders = orders.filter((p) => byRes(p.resellerId) && isToday(p.tgl));
   const today = statsOf(todayOrders);
-  const jualToday = nilaiJual(state, todayOrders);
-  // Keuntungan hari ini = Transfer − ongkir − karantina − operasional − harga jual (Stok barang)
-  const untungToday = today.transfer - today.ongkir - today.karantina - today.ops - jualToday;
-  const mpj = useMemo(() => marginPerJenis(state, resOrders, mainOrders), [state, resOrders, mainOrders]);
+  // Harga reseller = harga jual dari Stok barang (sama seperti Rekapan Pesanan baru mode Reseller)
   const jualRes = useMemo(() => nilaiJual(state, resOrders), [state, resOrders]);
+  // Laba = Transfer − ongkir − karantina − operasional − harga reseller
+  const labaRes = st.transfer - st.ongkir - st.karantina - st.ops - jualRes;
+  const marginRes = pct(labaRes, st.transfer - st.ongkir - st.karantina);
+  const modalPct = pct(jualRes, st.transfer);
   const returF = returs.filter((r) => byRes(r.resellerId) && inRange(r.tgl));
   const rusakF = rusakRes.filter((r) => byRes(r.resellerId || "") && inRange(r.tgl));
 
@@ -142,97 +129,6 @@ export default function ResellerScreen() {
     toast.show(aktif ? "Reseller diaktifkan" : "Reseller dinonaktifkan");
   }
 
-  // ---- Retur & rusak ----
-  const soldTo = (rid: string, jenis: string) =>
-    orders.filter((p) => p.resellerId === rid).reduce((a, p) => a + p.items.filter((i) => i.jenis === jenis).reduce((x, i) => x + i.jml, 0), 0);
-  const returnedFrom = (rid: string, jenis: string) =>
-    returs.filter((r) => r.resellerId === rid && r.jenis === jenis).reduce((a, r) => a + r.jml, 0);
-  const jenisRetur = mRes
-    ? Array.from(new Set(orders.filter((p) => p.resellerId === mRes).flatMap((p) => p.items.map((i) => i.jenis))))
-    : [];
-  const jenisOpts = mode === "retur" ? jenisRetur : jenisList(state);
-  const maxJml =
-    mode === "retur" ? (mRes && mJenis ? soldTo(mRes, mJenis) - returnedFrom(mRes, mJenis) : 0) : mJenis ? sisaStok(state, mJenis) : 0;
-
-  function bukaMode(m: Mode) {
-    setMode(m);
-    setMRes(filterRes || "");
-    setMJenis("");
-    setMJml("");
-    setMKet("");
-  }
-
-  function simpanMode() {
-    const q = Number(mJml);
-    if (!mRes || !mJenis || !(q > 0) || !Number.isInteger(q)) {
-      toast.show("Pilih reseller, jenis, dan isi jumlah pohon (bilangan bulat)");
-      return;
-    }
-    if (q > maxJml) {
-      toast.show(mode === "retur" ? `Maksimal retur ${maxJml} pohon (sisa yang dijual ke reseller ini)` : `Stok ${mJenis} hanya tersisa ${maxJml} pohon`);
-      return;
-    }
-    if (mode === "retur") {
-      const items = orders.filter((p) => p.resellerId === mRes).flatMap((p) => p.items.filter((i) => i.jenis === mJenis));
-      const tot = items.reduce((a, i) => a + i.jml, 0);
-      const hpp = tot > 0 ? Math.round(items.reduce((a, i) => a + i.hpp * i.jml, 0) / tot) : 0;
-      const r: ReturReseller = { id: uid(), tgl: todayISO(), resellerId: mRes, jenis: mJenis, jml: q, hpp, ket: mKet.trim() };
-      setState((s) => ({ ...s, returReseller: [r, ...(s.returReseller || [])] }));
-      toast.show(`Retur ${q} pohon ${mJenis} dicatat, stok bertambah`);
-    } else {
-      const r: Rusak = { id: uid(), tgl: todayISO(), jenis: mJenis, jml: q, harga: hppKeluarFIFO(state, mJenis, q), ket: mKet.trim(), resellerId: mRes };
-      setState((s) => ({ ...s, rusak: [r, ...(s.rusak || [])] }));
-      toast.show(`Rusak ${q} pohon ${mJenis} dicatat`);
-    }
-    setMode(null);
-  }
-
-  // ---- Riwayat ----
-  type Row = { id: string; tgl: string; kind: Exclude<Hist, "semua">; title: string; sub: string; val: string };
-  const rows: Row[] = [
-    ...(hist === "semua" || hist === "jual"
-      ? resOrders.map((p) => ({
-          id: p.id,
-          tgl: p.tgl,
-          kind: "jual" as const,
-          title: p.resellerNama || nameOf(p.resellerId),
-          sub: p.items.map((i) => `${i.jenis} x${i.jml}`).join(", "),
-          val: formatRp(p.transfer),
-        }))
-      : []),
-    ...(hist === "semua" || hist === "retur"
-      ? returF.map((r) => ({ id: r.id, tgl: r.tgl, kind: "retur" as const, title: nameOf(r.resellerId), sub: `${r.jenis} +${r.jml}${r.ket ? ` · ${r.ket}` : ""}`, val: `+${r.jml} pohon` }))
-      : []),
-    ...(hist === "semua" || hist === "rusak"
-      ? rusakF.map((r) => ({ id: r.id, tgl: r.tgl, kind: "rusak" as const, title: nameOf(r.resellerId), sub: `${r.jenis} −${r.jml}${r.ket ? ` · ${r.ket}` : ""}`, val: `−${r.jml} pohon` }))
-      : []),
-  ].sort((a, b) => new Date(b.tgl).getTime() - new Date(a.tgl).getTime());
-
-  function hapusHist(row: Row) {
-    if (row.kind === "jual") {
-      const p = orders.find((x) => x.id === row.id);
-      const bad = p ? p.items.find((it) => returnedFrom(p.resellerId, it.jenis) > soldTo(p.resellerId, it.jenis) - it.jml) : undefined;
-      if (p && bad) {
-        toast.show(`Tidak bisa dihapus: ${bad.jenis} sudah diretur. Hapus catatan returnya dulu.`);
-        setConfirmHist(null);
-        return;
-      }
-    }
-    if (row.kind === "retur") {
-      const r = returs.find((x) => x.id === row.id);
-      if (r && sisaStok(state, r.jenis) < r.jml) {
-        toast.show(`Tidak bisa dihapus: stok ${r.jenis} akan minus`);
-        setConfirmHist(null);
-        return;
-      }
-    }
-    if (row.kind === "jual") setState((s) => ({ ...s, pesananReseller: (s.pesananReseller || []).filter((p) => p.id !== row.id) }));
-    else if (row.kind === "retur") setState((s) => ({ ...s, returReseller: (s.returReseller || []).filter((r) => r.id !== row.id) }));
-    else setState((s) => ({ ...s, rusak: (s.rusak || []).filter((r) => r.id !== row.id) }));
-    setConfirmHist(null);
-    toast.show("Catatan dihapus, stok dihitung ulang");
-  }
-
   const back = () => (router.canGoBack() ? router.back() : router.replace("/dashboard"));
 
   if (!loaded) {
@@ -261,63 +157,103 @@ export default function ResellerScreen() {
         ))}
       </ScrollView>
 
-      {/* 1. Ringkasan hari ini */}
-      <View style={styles.hero} testID="res-hari-ini">
-        <Text style={styles.heroTitle}>Ringkasan hari ini · Reseller</Text>
-        <View style={{ flexDirection: "row", marginTop: spacing.md }}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.heroLbl}>Penjualan</Text>
-            <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit testID="res-hari-penjualan">{formatRp(today.transfer)}</Text>
+      {/* 1. Ringkasan hari ini (data dari Performa Finansial Reseller) */}
+      <LinearGradient
+        colors={[colors.brandPrimary, colors.brandDeep]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+        testID="res-hari-ini"
+      >
+        <View style={styles.heroHead}>
+          <View style={styles.heroIcon}>
+            <Ionicons name="sunny-outline" size={18} color={colors.onBrandPrimary} />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.heroLbl}>Keuntungan</Text>
-            <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit testID="res-hari-untung">{formatRp(untungToday)}</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.heroTitle}>Ringkasan hari ini · Reseller</Text>
+            <Text style={styles.heroDate} numberOfLines={1}>{formatTgl(new Date().toISOString())}</Text>
           </View>
         </View>
-        <Text style={[styles.heroLbl, { marginTop: spacing.sm }]}>{today.jml} pesanan · {today.pohon} pohon keluar</Text>
-        <Text style={[styles.heroLbl, { marginTop: 4 }]} testID="res-hari-harga-jual">
-          Harga jual (Stok barang): {formatRp(jualToday)}
+        <View style={styles.heroRow}>
+          <View style={styles.heroCell}>
+            <Text style={styles.heroLbl}>Penjualan</Text>
+            <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55} testID="res-hari-penjualan">
+              {formatRp(st.transfer)}
+            </Text>
+          </View>
+          <View style={styles.heroDivider} />
+          <View style={styles.heroCell}>
+            <Text style={styles.heroLbl}>Keuntungan</Text>
+            <Text
+              style={[styles.heroVal, labaRes < 0 && { color: colors.accentMuted }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.55}
+              testID="res-hari-untung"
+            >
+              {formatRp(labaRes)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.heroLine} />
+        <Text style={styles.heroFoot} numberOfLines={1}>
+          {today.jml} pesanan · {today.pohon} pohon keluar
         </Text>
-      </View>
+      </LinearGradient>
 
       {/* 2. Performa finansial */}
-      <Card testID="res-performa">
-        <Text style={styles.cardTitle}>Performa Finansial Reseller</Text>
-        <Row k="Omzet (harga reseller)" v={formatRp(st.omset)} testID="res-omzet" />
-        <Row k="Total harga jual (Stok barang)" v={formatRp(jualRes)} testID="res-modal" />
-        <Row k="Laba" v={formatRp(st.laba)} danger={st.laba < 0} testID="res-laba" />
-        <Row k="Margin total (omzet − HPP − biaya)" v={`${st.margin.toFixed(1)}%`} danger={st.laba < 0} testID="res-margin" />
-        <View style={styles.compare} testID="res-banding">
-          <Text style={styles.compareTitle}>Margin rata-rata (dari harga jual Stok barang)</Text>
-          <Row k="Reseller dapat" v={mpj.hasReseller ? `${mpj.avgReseller.toFixed(1)}%` : "-"} testID="res-avg-reseller" />
-          <Row k="Penjualan utama" v={mpj.hasUtama ? `${mpj.avgUtama.toFixed(1)}%` : "-"} testID="res-avg-utama" />
-          <Text style={styles.muted}>
-            Reseller = (harga jual − harga reseller) ÷ harga jual. Utama = (harga jual − HPP) ÷ harga jual.
-          </Text>
-        </View>
-        <Text style={[styles.compareTitle, { marginTop: spacing.md }]}>Margin % per jenis</Text>
-        {mpj.rows.length === 0 ? (
-          <Text style={styles.muted}>Belum ada penjualan</Text>
-        ) : (
-          <View testID="res-margin-jenis">
-            <View style={[styles.tr, styles.thead]}>
-              <Text style={[styles.th, { flex: 1 }]}>Jenis</Text>
-              <Text style={[styles.th, styles.num]}>Reseller</Text>
-              <Text style={[styles.th, styles.num]}>Utama</Text>
-            </View>
-            {mpj.rows.map((r) => (
-              <View key={r.jenis} style={styles.tr}>
-                <Text style={[styles.td, { flex: 1 }]} numberOfLines={1}>{r.jenis}</Text>
-                <Text style={[styles.td, styles.num, r.reseller !== null && r.reseller < 0 && { color: colors.accent }]}>
-                  {r.reseller === null ? "-" : `${r.reseller.toFixed(1)}%`}
-                </Text>
-                <Text style={[styles.td, styles.num]}>{r.utama === null ? "-" : `${r.utama.toFixed(1)}%`}</Text>
-              </View>
-            ))}
+      <View style={styles.card} testID="res-performa">
+        <View style={styles.finHead}>
+          <View style={styles.finIcon}>
+            <Ionicons name="cash-outline" size={16} color={colors.brandPrimary} />
           </View>
-        )}
-        <Text style={[styles.muted, { marginTop: 6 }]}>Harga jual mengikuti harga terbaru di menu Stok barang. Jenis tanpa harga jual tidak dihitung.</Text>
-      </Card>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.finTitle}>Performa Finansial Reseller</Text>
+            <Text style={styles.finSub}>Akumulasi pesanan reseller</Text>
+          </View>
+        </View>
+        <View style={[styles.finRow, { marginTop: spacing.md }]}>
+          <View style={styles.finBox} testID="res-modal">
+            <View style={styles.finBoxHead}>
+              <Text style={styles.finLbl}>Harga Reseller</Text>
+              <View style={styles.pctPill}>
+                <Text style={styles.pctText}>{modalPct.toFixed(1)}%</Text>
+              </View>
+            </View>
+            <Text style={styles.finVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatRp(jualRes)}</Text>
+            <Text style={styles.finNote} numberOfLines={1}>Harga jual Stok barang</Text>
+          </View>
+          <View style={[styles.finBox, { alignItems: "flex-end" }]} testID="res-omzet">
+            <Text style={styles.finLbl}>Total Penjualan</Text>
+            <Text style={styles.finVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatRp(st.transfer)}</Text>
+            <Text style={styles.finNote} numberOfLines={1}>Total customer transfer</Text>
+          </View>
+        </View>
+        <View style={styles.finRow}>
+          <MiniBox label="Ongkir" val={st.ongkir} note="Pengiriman" />
+          <MiniBox label="Karantina" val={st.karantina} note="Uji tanaman" />
+          <MiniBox label="Operasional" val={st.ops} note="Perlengkapan" />
+        </View>
+        <View style={[styles.labaBox, labaRes < 0 && styles.labaBoxNeg]} testID="res-laba">
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" }}>
+              <Text style={[styles.labaLbl, labaRes < 0 && { color: colors.accent }]}>Laba Bersih (Profit)</Text>
+              <View style={styles.marginPill}>
+                <Text style={[styles.marginText, labaRes < 0 && { color: colors.accent }]} testID="res-margin">
+                  {marginRes >= 0 ? "+" : ""}
+                  {marginRes.toFixed(1)}% Margin
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.labaVal, labaRes < 0 && { color: colors.accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              {formatRp(labaRes)}
+            </Text>
+          </View>
+          <View style={styles.labaIcon}>
+            <Ionicons name={labaRes < 0 ? "trending-down" : "trending-up"} size={20} color={labaRes < 0 ? colors.accent : colors.brandPrimary} />
+          </View>
+        </View>
+      </View>
 
       {/* Pesanan & barang keluar */}
       <Card testID="res-pesanan-keluar">
@@ -327,7 +263,6 @@ export default function ResellerScreen() {
         <Row k="Pohon retur (masuk)" v={String(retPohon)} testID="res-pohon-retur" />
         <Row k="Pohon rusak" v={String(rusPohon)} testID="res-pohon-rusak" />
         <Row k="Total harga jual keluar" v={formatRp(jualRes)} testID="res-jual-keluar" />
-        <Row k="Keuntungan" v={formatRp(st.laba)} danger={st.laba < 0} />
       </Card>
 
       {/* 3. Kelola reseller */}
@@ -404,106 +339,6 @@ export default function ResellerScreen() {
         </Card>
       )}
 
-      {/* 4. Retur & rusak */}
-      <View style={{ gap: spacing.sm }}>
-        <Button title="Retur / Barang masuk" icon="arrow-undo-outline" kind="alt" onPress={() => bukaMode("retur")} testID="btn-retur" />
-        <Button title="Barang rusak" icon="alert-circle-outline" kind="danger" onPress={() => bukaMode("rusak")} testID="btn-rusak-reseller" />
-      </View>
-      {mode && (
-        <Card testID="mode-panel">
-          <Text style={styles.cardTitle}>{mode === "retur" ? "Retur dari reseller (stok bertambah)" : "Barang rusak dari reseller (stok berkurang)"}</Text>
-          <Text style={styles.lbl}>Reseller</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow} contentContainerStyle={styles.chipRowContent}>
-            {resellers.map((r) => (
-              <ChipBtn key={r.id} label={r.nama} active={mRes === r.id} onPress={() => { setMRes(r.id); setMJenis(""); }} testID={`mode-res-${r.id}`} />
-            ))}
-          </ScrollView>
-          <Text style={styles.lbl}>Jenis</Text>
-          {jenisOpts.length === 0 ? (
-            <Text style={styles.muted}>{mode === "retur" ? (mRes ? "Reseller ini belum punya penjualan" : "Pilih reseller dulu") : "Belum ada jenis"}</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow} contentContainerStyle={styles.chipRowContent}>
-              {jenisOpts.map((j) => (
-                <ChipBtn key={j} label={j} active={mJenis === j} onPress={() => setMJenis(j)} testID={`mode-jenis-${j}`} />
-              ))}
-            </ScrollView>
-          )}
-          {mJenis ? (
-            <Text style={styles.muted} testID="mode-max">
-              {mode === "retur" ? `Maks. retur: ${maxJml} pohon` : `Stok tersedia: ${maxJml} pohon`}
-            </Text>
-          ) : null}
-          <Field label="Jumlah pohon" required>
-            <Input value={mJml} onChangeText={setMJml} keyboardType="number-pad" testID="mode-jml" />
-          </Field>
-          <Field label="Keterangan">
-            <Input value={mKet} onChangeText={setMKet} testID="mode-ket" />
-          </Field>
-          <View style={styles.btnRow}>
-            <Button title="Batal" kind="ghost" onPress={() => setMode(null)} style={{ flex: 1 }} testID="mode-batal" />
-            <Button title="Simpan" icon="checkmark" kind={mode === "rusak" ? "danger" : "primary"} onPress={simpanMode} style={{ flex: 1 }} testID="mode-simpan" />
-          </View>
-        </Card>
-      )}
-
-      {/* 5. Riwayat */}
-      <Card testID="res-riwayat">
-        <Text style={styles.cardTitle}>Riwayat</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow} contentContainerStyle={styles.chipRowContent}>
-          {(
-            [
-              ["semua", "Semua"],
-              ["jual", "Penjualan"],
-              ["retur", "Retur"],
-              ["rusak", "Rusak"],
-            ] as [Hist, string][]
-          ).map(([k, l]) => (
-            <ChipBtn key={k} label={l} active={hist === k} onPress={() => setHist(k)} testID={`hist-${k}`} />
-          ))}
-        </ScrollView>
-        {rows.length === 0 && <Text style={styles.muted}>Belum ada catatan</Text>}
-        <View style={{ gap: spacing.sm }}>
-          {rows.map((r) => (
-            <View key={r.kind + r.id} style={styles.resRow} testID={`hist-row-${r.id}`}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-                <View style={[styles.kind, r.kind === "rusak" ? styles.kindRed : r.kind === "retur" ? styles.kindGreen : null]}>
-                  <Text style={[styles.kindText, r.kind === "rusak" && { color: colors.accent }]}>
-                    {r.kind === "jual" ? "Jual" : r.kind === "retur" ? "Retur" : "Rusak"}
-                  </Text>
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.resName} numberOfLines={1}>{r.title}</Text>
-                  <Text style={styles.muted} numberOfLines={1}>{formatTgl(r.tgl)} · {r.sub}</Text>
-                </View>
-                <Text style={styles.histVal}>{r.val}</Text>
-              </View>
-              <View style={[styles.btnRow, { marginTop: 6 }]}>
-                {r.kind === "jual" && (
-                  <Pressable
-                    onPress={() => router.push({ pathname: "/pesanan-baru", params: { id: r.id, src: "reseller" } })}
-                    style={styles.linkBtn}
-                    testID={`hist-edit-${r.id}`}
-                  >
-                    <Text style={styles.link}>Ubah</Text>
-                  </Pressable>
-                )}
-                <Pressable onPress={() => setConfirmHist(r.id)} style={styles.linkBtn} testID={`hist-hapus-${r.id}`}>
-                  <Text style={[styles.link, { color: colors.accent }]}>Hapus</Text>
-                </Pressable>
-              </View>
-              {confirmHist === r.id && (
-                <View style={styles.confirm}>
-                  <Text style={styles.confirmText}>Hapus catatan ini? Stok akan dihitung ulang.</Text>
-                  <View style={styles.btnRow}>
-                    <Button title="Batal" kind="alt" onPress={() => setConfirmHist(null)} style={{ flex: 1 }} testID={`hist-batal-${r.id}`} />
-                    <Button title="Hapus" kind="danger" onPress={() => hapusHist(r)} style={{ flex: 1 }} testID={`hist-hapus-ya-${r.id}`} />
-                  </View>
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
-      </Card>
     </Screen>
   );
 }
@@ -525,6 +360,17 @@ function Row({ k, v, danger, testID }: { k: string; v: string; danger?: boolean;
   );
 }
 
+function MiniBox({ label, val, note }: { label: string; val: number; note: string }) {
+  return (
+    <View style={[styles.finBox, styles.miniBox]}>
+      <Text style={styles.finLbl} numberOfLines={1}>{label}</Text>
+      <Text style={styles.miniVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatRp(val)}</Text>
+      <Text style={styles.finNote} numberOfLines={1}>{note}</Text>
+    </View>
+  );
+}
+
+const tabular = { fontVariant: ["tabular-nums" as const] };
 const W = "rgba(255,255,255,";
 const styles = StyleSheet.create({
   chipRow: { flexGrow: 0, height: 56 },
@@ -542,23 +388,81 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.brandDeep, borderColor: colors.brandDeep },
   chipText: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: colors.muted },
   chipTextActive: { color: colors.onBrandPrimary },
-  hero: { backgroundColor: colors.brandPrimary, borderRadius: 24, padding: spacing.lg },
+  hero: { borderRadius: 24, padding: spacing.lg, overflow: "hidden" },
+  heroHead: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  heroIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: W + "0.14)",
+    borderWidth: 1,
+    borderColor: W + "0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   heroTitle: { fontFamily: fonts.semibold, fontSize: fontSize.lg, color: colors.onBrandPrimary },
-  heroLbl: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: W + "0.8)" },
-  heroVal: { fontFamily: fonts.bold, fontSize: fontSize.xl, color: colors.onBrandPrimary },
+  heroDate: { fontFamily: fonts.body, fontSize: fontSize.sm, color: W + "0.75)" },
+  heroRow: { flexDirection: "row", marginTop: spacing.xl },
+  heroCell: { flex: 1, minWidth: 0, gap: 4 },
+  heroDivider: { width: 1, backgroundColor: W + "0.2)", marginHorizontal: spacing.md },
+  heroLbl: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: W + "0.78)" },
+  heroVal: { fontFamily: fonts.bold, fontSize: fontSize.xxl, color: colors.onBrandPrimary, ...tabular },
+  heroLine: { height: 1, backgroundColor: W + "0.16)", marginVertical: spacing.lg },
+  heroFoot: { fontFamily: fonts.medium, fontSize: fontSize.sm, color: W + "0.85)" },
+  card: { backgroundColor: colors.surfaceSecondary, borderRadius: 20, padding: spacing.lg, ...shadow.card },
+  finHead: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  finIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" },
+  finTitle: { fontFamily: fonts.semibold, fontSize: fontSize.base, color: colors.onSurface },
+  finSub: { fontFamily: fonts.body, fontSize: 11, color: colors.muted },
+  finRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm },
+  finBox: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSecondary,
+    padding: spacing.md,
+    gap: 4,
+  },
+  miniBox: { padding: spacing.sm + 2, borderRadius: 14 },
+  finBoxHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 4 },
+  finLbl: { fontFamily: fonts.medium, fontSize: 11, color: colors.muted },
+  finVal: { fontFamily: fonts.bold, fontSize: fontSize.lg + 1, color: colors.onSurface, ...tabular },
+  miniVal: { fontFamily: fonts.bold, fontSize: fontSize.sm + 1, color: colors.onSurface, ...tabular },
+  finNote: { fontFamily: fonts.body, fontSize: 10, color: colors.muted },
+  pctPill: { height: 20, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, justifyContent: "center" },
+  pctText: { fontFamily: fonts.medium, fontSize: 10, color: colors.muted, ...tabular },
+  labaBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.brandTertiary,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.brandSecondary,
+    padding: spacing.lg,
+    marginTop: 2,
+  },
+  labaBoxNeg: { backgroundColor: colors.accentMuted, borderColor: colors.accentMuted },
+  labaLbl: { fontFamily: fonts.semibold, fontSize: fontSize.sm, color: colors.brandPrimary },
+  marginPill: {
+    height: 20,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceSecondary,
+    justifyContent: "center",
+  },
+  marginText: { fontFamily: fonts.semibold, fontSize: 10, color: colors.brandPrimary, ...tabular },
+  labaVal: { fontFamily: fonts.bold, fontSize: fontSize.xxl, color: colors.brandPrimary, marginTop: 6, ...tabular },
+  labaIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" },
   cardTitle: { fontFamily: fonts.bold, fontSize: fontSize.lg, color: colors.onSurface, marginBottom: spacing.sm },
-  compare: { marginTop: spacing.md, padding: spacing.md, borderRadius: 16, backgroundColor: colors.brandTertiary },
-  compareTitle: { fontFamily: fonts.semibold, fontSize: fontSize.base, color: colors.brandPrimary, marginBottom: 4 },
   muted: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.sm + 1 },
-  lbl: { fontFamily: fonts.semibold, fontSize: fontSize.base - 1, color: colors.onSurface },
   row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, gap: spacing.sm },
   rowKey: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.base, flexShrink: 1 },
   rowVal: { fontFamily: fonts.bold, color: colors.onSurface, fontSize: fontSize.base },
-  tr: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.divider },
-  thead: { backgroundColor: colors.surfaceTertiary, borderRadius: radius.md, paddingHorizontal: 6 },
-  th: { fontFamily: fonts.bold, fontSize: fontSize.sm, color: colors.onSurfaceTertiary },
-  td: { fontFamily: fonts.medium, fontSize: fontSize.base - 1, color: colors.onSurface, paddingHorizontal: 6 },
-  num: { width: 80, textAlign: "right" },
   resRow: { padding: spacing.md, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.divider },
   resName: { fontFamily: fonts.semibold, fontSize: fontSize.base, color: colors.onSurface },
   iconBtn: {
@@ -572,11 +476,4 @@ const styles = StyleSheet.create({
   confirm: { marginTop: spacing.sm, padding: spacing.md, borderRadius: 14, backgroundColor: colors.accentMuted, gap: spacing.sm },
   confirmText: { fontFamily: fonts.medium, fontSize: fontSize.sm + 1, color: colors.onAccentMuted },
   btnRow: { flexDirection: "row", gap: spacing.sm },
-  kind: { height: 24, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.surfaceTertiary, justifyContent: "center" },
-  kindRed: { backgroundColor: colors.accentMuted },
-  kindGreen: { backgroundColor: colors.brandTertiary },
-  kindText: { fontFamily: fonts.semibold, fontSize: 11, color: colors.brandPrimary },
-  histVal: { fontFamily: fonts.bold, fontSize: fontSize.sm + 1, color: colors.onSurface },
-  linkBtn: { minHeight: 36, justifyContent: "center", paddingHorizontal: 4 },
-  link: { fontFamily: fonts.semibold, fontSize: fontSize.sm + 1, color: colors.brandPrimary },
 });

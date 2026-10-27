@@ -13,6 +13,7 @@ export function Rekapan({
   hargaJualStok,
   jualLabel = "Harga jual (Stok barang)",
   hideHargaJual,
+  jualAtTop,
 }: {
   transfer: number;
   ongkir: number;
@@ -24,6 +25,8 @@ export function Rekapan({
   hargaJualStok?: number;
   jualLabel?: string;
   hideHargaJual?: boolean;
+  // Tampilkan baris harga jual Stok barang tepat di atas Ongkir
+  jualAtTop?: boolean;
 }) {
   const og = codOngkir ? 0 : ongkir;
   const hargaJual = transfer - karantina - og;
@@ -36,13 +39,14 @@ export function Rekapan({
   return (
     <View>
       <RRow label="Total Customer Transfer" val={transfer} />
+      {jualAtTop && hargaJualStok !== undefined && <RRow label={`− ${jualLabel}`} val={-hargaJualStok} />}
       <RRow label="− Ongkir" val={-og} />
       <RRow label="− Biaya karantina" val={-karantina} />
       {!hideHargaJual && <RRow label="= Harga jual" val={hargaJual} bold />}
       {hargaJualStok === undefined ? (
         <RRow label="− Total HPP" val={-hpp} />
       ) : (
-        <RRow label={`− ${jualLabel}`} val={-hargaJualStok} />
+        !jualAtTop && <RRow label={`− ${jualLabel}`} val={-hargaJualStok} />
       )}
       <RRow label="− Biaya operasional" val={-ops} />
       <RRow label="= Keuntungan" val={keuntungan} bold danger={keuntungan < 0} />
