@@ -424,7 +424,7 @@ export default function PesananBaruScreen() {
                     </Pressable>
                   </View>
                   <Text style={styles.muted}>
-                    HPP {formatRp(it.hpp)} · sisa {sisa}
+                    {resellerOn ? `Harga reseller ${formatRp(hargaJenis(stokState, it.jenis).jual)}` : `HPP ${formatRp(it.hpp)}`} · sisa {sisa}
                   </Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: 6 }}>
                     <Text style={styles.labelInline}>Jumlah</Text>
@@ -437,7 +437,11 @@ export default function PesananBaruScreen() {
                       />
                     </View>
                   </View>
-                  <Text style={styles.subtotal}>Subtotal HPP: {formatRp(it.hpp * it.jml)}</Text>
+                  <Text style={styles.subtotal}>
+                    {resellerOn
+                      ? `Subtotal Harga reseller: ${formatRp(hargaJenis(stokState, it.jenis).jual * it.jml)}`
+                      : `Subtotal HPP: ${formatRp(it.hpp * it.jml)}`}
+                  </Text>
                   {resellerOn && (
                     <View style={{ marginTop: 6 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
