@@ -682,10 +682,10 @@ function EditSheet({
         <Input value={draft.jml} onChangeText={(v) => setDraft((d) => ({ ...d, jml: v }))} keyboardType="number-pad" testID="edit-jml" />
       </Field>
       <View style={{ flexDirection: "row", gap: spacing.sm }}>
-        <Field label="HPP" required style={{ flex: 1 }}>
+        <Field label="HPP" required style={{ flex: 1, minWidth: 0 }}>
           <Input value={draft.harga} onChangeText={(v) => setDraft((d) => ({ ...d, harga: v }))} keyboardType="number-pad" testID="edit-hpp" />
         </Field>
-        <Field label="Harga jual" style={{ flex: 1 }}>
+        <Field label="Harga jual" style={{ flex: 1, minWidth: 0 }}>
           <Input value={draft.jual} onChangeText={(v) => setDraft((d) => ({ ...d, jual: v }))} keyboardType="number-pad" testID="edit-jual" />
         </Field>
       </View>

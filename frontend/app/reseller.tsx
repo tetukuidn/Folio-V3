@@ -309,7 +309,7 @@ export default function ResellerScreen() {
             ))}
           </View>
         )}
-        <Text style={[styles.muted, { marginTop: 6 }]}>Harga jual mengikuti harga terbaru di menu Stok barang. Jenis tanpa harga jual tampil "-".</Text>
+        <Text style={[styles.muted, { marginTop: 6 }]}>Harga jual mengikuti harga terbaru di menu Stok barang. Jenis tanpa harga jual tidak dihitung.</Text>
       </Card>
 
       {/* Pesanan & barang keluar */}

@@ -1,0 +1,26 @@
+{
+  "summary": "Retest of the iteration 8 issues. Viewport 375x667, plus 360 and 390 for the Stok barang edit sheet. Token test_dash_ui_token. (1) marginPerJenis FIXED. With TEST_B harga jual = 0 and TEST_A at 25000: res-avg-utama 60.0% (TEST_A only, matching its row), reseller 20.0%, and the TEST_B row is left out. With TEST_A at 30000: res-avg-utama 66.7%, res-avg-reseller 33.3%, res-jual-keluar Rp 120.000, and the TEST_A row 33.3% / 66.7%. Seeded baseline unchanged: Rp 100.000, 20.0%, 53.8%, TEST_A 20.0% / 60.0%, TEST_B - / 50.0%. (2) The kurir line on reseller cards now reads '1 kg' with no leading separator. (3) openDetail is keyed by source + id: Detail opens only one card. (4) res-margin is labelled 'Margin total (omzet − HPP − biaya)' = 50.0%. (5) Stok barang edit sheet: the overflow was NOT fixed by adding minWidth 0 to the Field wrappers. The TextInput itself has an intrinsic web width of about 180px and Input styles.input had no minWidth 0. Result: HPP and Harga jual spilled past their wrappers, and focusing edit-jual scrolled the sheet sideways so the left labels were cut off, at both 360 and 390. FIXED by testing agent: added minWidth 0 to styles.input in ui.tsx:253, verified at 360 and 390. Regression: chips Semua (7) / Utama (5) / Reseller (2), filtering and badges correct. The status chip toggles Dikirim -> Problem on reseller TEST_pr1 and main p1, and both changes are saved in the backend. Seeds restored.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Input (src/components/ui.tsx:253)", "issue": "FIXED by testing agent. In the Stok barang edit sheet, the HPP and Harga jual TextInputs (about 180px each) overflowed their flex wrappers (about 150px) at 360 and 390. Focusing edit-jual scrolled the sheet sideways and cut off the left labels. The Field minWidth 0 alone did not help, because the TextInput had flex 1 without minWidth 0. Added minWidth: 0 to styles.input.", "testID": "edit-jual", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/patch_data_helper.py"],
+  "action_items": [
+    "None blocking. Optional, carried from iteration 8: give status-chip a 44px touch target (minHeight or hitSlop), and have Chip render a plain View when onPress is undefined."
+  ],
+  "critical_code_review_comments": [
+    "The ui.tsx Input fix applies to every Input in the app. That should be harmless, since it only lets inputs shrink inside flex rows.",
+    "When a jenis has no harga jual, its row is dropped from res-margin-jenis instead of showing '-'. The footnote says 'Jenis tanpa harga jual tampil \"-\"', so it slightly contradicts what the user sees. Consider keeping the row with '-' / '-', or updating the footnote."
+  ],
+  "updated_files": ["/app/frontend/src/components/ui.tsx"],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100% after the testing agent's Input minWidth fix"},
+  "seed_data_creation": "seed_reseller_ui.py was re-run at the end. Harga jual is back to 25000/40000/9000, statuses are back to Dikirim, and returReseller is back to 4.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Token test_dash_ui_token. patch_data_helper.py actions: show, retur2, jual:<belanjaId>:<val> (belanja ids ba/bb/bc = TEST_A/B/C). Expected numbers with the seed: res-modal 100.000, reseller 20.0%, utama 53.8%."
+}

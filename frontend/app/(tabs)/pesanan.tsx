@@ -127,8 +127,8 @@ export default function PesananScreen() {
           key={(res ? "r" : "u") + p.id}
           p={p}
           reseller={res}
-          open={!!openDetail[p.id]}
-          onToggleOpen={() => setOpenDetail((d) => ({ ...d, [p.id]: !d[p.id] }))}
+          open={!!openDetail[(res ? "r" : "u") + p.id]}
+          onToggleOpen={() => setOpenDetail((d) => ({ ...d, [(res ? "r" : "u") + p.id]: !d[(res ? "r" : "u") + p.id] }))}
           onToggleStatus={() => (res ? toggleStatusRes(p.id) : toggleStatus(p.id))}
           onEdit={() => router.push({ pathname: "/pesanan-baru", params: res ? { id: p.id, src: "reseller" } : { id: p.id } })}
           onDelete={() => (res ? hapusRes(p.id) : hapus(p.id))}
@@ -188,8 +188,7 @@ function PesananCard({
       </View>
 
       <Text style={[styles.muted, { marginTop: spacing.sm }]}>
-        {p.kurir}
-        {p.layanan ? ` · ${p.layanan}` : ""} · {p.berat || 0} kg
+        {[p.kurir, p.layanan, `${p.berat || 0} kg`].filter(Boolean).join(" · ")}
       </Text>
 
       <View style={styles.moneyRow}>

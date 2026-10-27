@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   prefix: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.lg, marginRight: 6 },
-  input: { flex: 1, fontFamily: fonts.medium, fontSize: fontSize.lg, color: colors.onSurface, paddingVertical: 13 },
+  input: { flex: 1, minWidth: 0, fontFamily: fonts.medium, fontSize: fontSize.lg, color: colors.onSurface, paddingVertical: 13 },
   pickerBtn: {
     minHeight: 50,
     backgroundColor: colors.brandTertiary,
