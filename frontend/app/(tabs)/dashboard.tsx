@@ -109,7 +109,7 @@ export default function DashboardScreen() {
     for (const p of state.pesanan) {
       if (!sameDay(p.tgl)) continue;
       const r = hitungRekap(p);
-      omset += r.omset;
+      omset += r.totalTransfer;
       untung += r.keuntungan;
       pohon += p.items.reduce((a, i) => a + i.jml, 0);
       jml++;

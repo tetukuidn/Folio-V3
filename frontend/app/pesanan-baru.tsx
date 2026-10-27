@@ -597,8 +597,8 @@ export default function PesananBaruScreen() {
           ops={opsN}
           hpp={totalHppForm}
           codOngkir={form.codOngkir}
-          hargaJualStok={totalJualStokForm}
-          jualLabel="Harga reseller"
+          hargaJualStok={totalHppForm}
+          jualLabel="HPP"
           hideHargaJual
         />
         {resellerOn && (

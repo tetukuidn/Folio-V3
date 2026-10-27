@@ -267,7 +267,7 @@ export default function ResellerScreen() {
         <View style={{ flexDirection: "row", marginTop: spacing.md }}>
           <View style={{ flex: 1 }}>
             <Text style={styles.heroLbl}>Penjualan</Text>
-            <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit testID="res-hari-penjualan">{formatRp(today.omset)}</Text>
+            <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit testID="res-hari-penjualan">{formatRp(today.transfer)}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.heroLbl}>Keuntungan</Text>
