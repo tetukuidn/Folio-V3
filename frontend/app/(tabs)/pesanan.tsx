@@ -163,8 +163,8 @@ function PesananCard({
 }) {
   const rek = hitungRekap(p);
   const jualStok = p.items.reduce((a, it) => a + jualOf(it) * it.jml, 0);
-  // Keuntungan = Transfer − ongkir − karantina − operasional − harga jual (Stok barang)
-  const keuntungan = rek.totalTransfer - rek.og - (p.karantina || 0) - (p.ops || 0) - jualStok;
+  // Keuntungan = Transfer − ongkir − karantina − operasional − (HPP untuk utama / harga jual Stok barang untuk reseller)
+  const keuntungan = rek.totalTransfer - rek.og - (p.karantina || 0) - (p.ops || 0) - (reseller ? jualStok : rek.totalHpp);
   return (
     <Card testID={`pesanan-card-${p.id}`} style={reseller ? styles.cardReseller : undefined}>
       <View style={[styles.srcBadge, reseller ? styles.srcBadgeRes : styles.srcBadgeUtama]} testID={`pesanan-badge-${p.id}`}>
@@ -262,7 +262,9 @@ function PesananCard({
               ops={p.ops}
               hpp={rek.totalHpp}
               codOngkir={p.codOngkir}
-              hargaJualStok={jualStok}
+              hargaJualStok={reseller ? jualStok : rek.totalHpp}
+              jualLabel={reseller ? undefined : "HPP"}
+              jualAtTop={!reseller}
             />
           </DetailBlock>
           <Pressable onPress={onDelete} style={{ alignSelf: "flex-start", marginTop: 4, minHeight: 44, justifyContent: "center" }}>
