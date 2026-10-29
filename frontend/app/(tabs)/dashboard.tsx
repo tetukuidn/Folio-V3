@@ -102,14 +102,19 @@ export default function DashboardScreen() {
         d.getDate() === now.getDate()
       );
     };
+    let transfer = 0;
+    let untung = 0;
     let pohon = 0;
     let jml = 0;
     for (const p of state.pesanan) {
       if (!sameDay(p.tgl)) continue;
+      const r = hitungRekap(p);
+      transfer += r.totalTransfer;
+      untung += r.keuntungan;
       pohon += p.items.reduce((a, i) => a + i.jml, 0);
       jml++;
     }
-    return { pohon, jml };
+    return { transfer, untung, pohon, jml };
   }, [state.pesanan]);
 
   const persediaanStats = useMemo(() => {
@@ -226,20 +231,20 @@ export default function DashboardScreen() {
           <View style={styles.heroCell}>
             <Text style={styles.heroLbl}>Penjualan</Text>
             <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55} testID="hari-ini-penjualan">
-              {formatRp(stats.transfer)}
+              {formatRp(hariIni.transfer)}
             </Text>
           </View>
           <View style={styles.heroDivider} />
           <View style={styles.heroCell}>
             <Text style={styles.heroLbl}>Keuntungan</Text>
             <Text
-              style={[styles.heroVal, stats.untung < 0 && { color: colors.accentMuted }]}
+              style={[styles.heroVal, hariIni.untung < 0 && { color: colors.accentMuted }]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.55}
               testID="hari-ini-keuntungan"
             >
-              {formatRp(stats.untung)}
+              {formatRp(hariIni.untung)}
             </Text>
           </View>
         </View>

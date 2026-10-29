@@ -81,6 +81,8 @@ export default function ResellerScreen() {
   const st = statsOf(resOrders);
   const todayOrders = orders.filter((p) => byRes(p.resellerId) && isToday(p.tgl));
   const today = statsOf(todayOrders);
+  // Ringkasan hari ini: hanya pesanan reseller tanggal hari ini
+  const labaToday = today.transfer - today.ongkir - today.karantina - today.ops - nilaiJual(state, todayOrders);
   // Harga reseller = harga jual dari Stok barang (sama seperti Rekapan Pesanan baru mode Reseller)
   const jualRes = useMemo(() => nilaiJual(state, resOrders), [state, resOrders]);
   // Laba = Transfer − ongkir − karantina − operasional − harga reseller
@@ -227,20 +229,20 @@ export default function ResellerScreen() {
           <View style={styles.heroCell}>
             <Text style={styles.heroLbl}>Penjualan</Text>
             <Text style={styles.heroVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55} testID="res-hari-penjualan">
-              {formatRp(st.transfer)}
+              {formatRp(today.transfer)}
             </Text>
           </View>
           <View style={styles.heroDivider} />
           <View style={styles.heroCell}>
             <Text style={styles.heroLbl}>Keuntungan</Text>
             <Text
-              style={[styles.heroVal, labaRes < 0 && { color: colors.accentMuted }]}
+              style={[styles.heroVal, labaToday < 0 && { color: colors.accentMuted }]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.55}
               testID="res-hari-untung"
             >
-              {formatRp(labaRes)}
+              {formatRp(labaToday)}
             </Text>
           </View>
         </View>
