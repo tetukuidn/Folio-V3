@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { ApiError, api } from "../api/client";
 import { useAuth } from "../auth";
 import { emptyProfil, emptyState, type Profil, type StoreState } from "./types";
+import { normalizeState } from "../utils/backup";
 
 type SyncStatus = "idle" | "saving" | "saved" | "error";
 
@@ -13,6 +14,7 @@ type Ctx = {
   setState: (updater: (s: StoreState) => StoreState) => void;
   saveProfil: (p: Profil) => Promise<void>;
   reset: () => void;
+  restore: (data: StoreState) => void;
   refresh: () => Promise<void>;
 };
 
@@ -32,16 +34,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const fetchData = useCallback(async () => {
     const res = await api<DataResponse>("/api/data");
     const d = res.data;
-    _setState({
-      belanja: d.belanja || [],
-      rusak: d.rusak || [],
-      suppliers: d.suppliers || [],
-      pesanan: d.pesanan || [],
-      sender: d.sender || emptyState().sender,
-      resellers: d.resellers || [],
-      pesananReseller: d.pesananReseller || [],
-      returReseller: d.returReseller || [],
-    });
+    _setState(normalizeState(d));
     setProfil({
       namaPemilik: d.profil?.namaPemilik || "",
       namaToko: d.profil?.namaToko || "",
@@ -104,6 +97,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     _setState(emptyState());
   }, []);
 
+  const restore = useCallback((data: StoreState) => {
+    dirty.current = true;
+    _setState(normalizeState(data));
+  }, []);
+
   const saveProfil = useCallback(
     async (p: Profil) => {
       const res = await api<{ profil: Profil }>("/api/profile", { method: "PUT", body: p });
@@ -113,8 +111,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<Ctx>(
-    () => ({ state, profil, loaded, sync, setState, saveProfil, reset, refresh: fetchData }),
-    [state, profil, loaded, sync, setState, saveProfil, reset, fetchData]
+    () => ({ state, profil, loaded, sync, setState, saveProfil, reset, restore, refresh: fetchData }),
+    [state, profil, loaded, sync, setState, saveProfil, reset, restore, fetchData]
   );
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

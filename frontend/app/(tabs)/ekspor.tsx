@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "@/src/components/screen";
 import { Button, Card, Field, Input } from "@/src/components/ui";
+import { BackupCard } from "@/src/components/backup-card";
 import { useToast } from "@/src/components/toast";
 import { useStore } from "@/src/store";
 import { colors, fonts, fontSize, radius, spacing } from "@/src/theme";
@@ -76,6 +77,7 @@ export default function EksporScreen() {
 
   return (
     <Screen title="Ekspor" subtitle="Format Upload Order Everpro">
+      <BackupCard />
       <Card>
         <Text style={styles.cardTitle}>Data pengirim (isi sekali)</Text>
         <View style={{ height: spacing.sm }} />
