@@ -40,6 +40,7 @@ function redirectUrl(): string {
 
 function pesanError(e: any, fallback: string): string {
   if (e?.message === "email_not_allowed") return "Akun ini tidak diizinkan membuka aplikasi";
+  if (e?.message === "store_only") return "Silakan unduh Folio resmi dari Play Store atau App Store";
   return e?.message || fallback;
 }
 

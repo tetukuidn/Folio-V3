@@ -13,18 +13,29 @@ EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/
 SESSION_DAYS = 7
 
 
-def _allowed() -> list:
-    # Daftar email yang boleh masuk. Entri diawali "@" = seluruh domain (mis. @example.com untuk akun uji).
-    raw = os.environ.get("ALLOWED_EMAILS", "")
+def _exempt() -> list:
+    # Email yang boleh membuka aplikasi dari mana saja (preview, Expo Go, APK sideload).
+    # Entri diawali "@" = seluruh domain (mis. @example.com untuk akun uji otomatis).
+    raw = os.environ.get("STORE_EXEMPT_EMAILS", "")
     return [e.strip().lower() for e in raw.split(",") if e.strip()]
 
 
-def is_email_allowed(email: str) -> bool:
-    allowed = _allowed()
-    if not allowed:
-        return True
+def is_exempt(email: str) -> bool:
     email = (email or "").strip().lower()
-    return any(email == a or (a.startswith("@") and email.endswith(a)) for a in allowed)
+    return any(email == a or (a.startswith("@") and email.endswith(a)) for a in _exempt())
+
+
+# Sumber instalasi resmi yang dikirim aplikasi lewat header X-App-Source
+STORE_SOURCES = {"com.android.vending", "appstore"}
+
+
+def check_access(email: str, app_source: Optional[str]) -> None:
+    """Semua akun Google boleh masuk, tapi hanya dari aplikasi yang diunduh di Play Store / App Store."""
+    if is_exempt(email):
+        return
+    if (app_source or "").strip().lower() in STORE_SOURCES:
+        return
+    raise HTTPException(status_code=403, detail="store_only")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -37,7 +48,10 @@ def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-async def get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
+async def get_current_user(
+    authorization: Optional[str] = Header(default=None),
+    x_app_source: Optional[str] = Header(default=None),
+) -> dict:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="not_authenticated")
     token = authorization.split(" ", 1)[1].strip()
@@ -50,9 +64,7 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
     user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="user_not_found")
-    if not is_email_allowed(user.get("email", "")):
-        await db.user_sessions.delete_one({"session_token": token})
-        raise HTTPException(status_code=403, detail="email_not_allowed")
+    check_access(user.get("email", ""), x_app_source)
     return user
 
 
@@ -66,7 +78,7 @@ def _public_user(user: dict) -> dict:
 
 
 @router.post("/session")
-async def create_session(payload: SessionRequest):
+async def create_session(payload: SessionRequest, x_app_source: Optional[str] = Header(default=None)):
     session_id = payload.session_id.strip()
     if not session_id:
         raise HTTPException(status_code=401, detail="missing_session_id")
@@ -83,8 +95,7 @@ async def create_session(payload: SessionRequest):
     email = (data.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(status_code=401, detail="email_missing")
-    if not is_email_allowed(email):
-        raise HTTPException(status_code=403, detail="email_not_allowed")
+    check_access(email, x_app_source)
     session_token = data.get("session_token")
     if not session_token:
         raise HTTPException(status_code=401, detail="session_token_missing")

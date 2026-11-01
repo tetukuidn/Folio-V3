@@ -49,7 +49,7 @@ export async function api<T>(
   opts: { method?: string; body?: unknown; auth?: boolean } = {}
 ): Promise<T> {
   const { method = "GET", body, auth = true } = opts;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", "X-App-Source": appSource() };
   if (auth) {
     const token = await loadToken();
     if (token) headers.Authorization = `Bearer ${token}`;
