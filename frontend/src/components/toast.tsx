@@ -15,8 +15,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     if (timer.current) clearTimeout(timer.current);
     Animated.timing(op, { toValue: 1, duration: 180, useNativeDriver: true }).start();
     timer.current = setTimeout(() => {
-      Animated.timing(op, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => {
-        setMsg(null);
+      Animated.timing(op, { toValue: 0, duration: 220, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) setMsg(null);
       });
     }, 2000);
   }, [op]);

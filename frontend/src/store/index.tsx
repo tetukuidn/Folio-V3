@@ -14,7 +14,7 @@ type Ctx = {
   setState: (updater: (s: StoreState) => StoreState) => void;
   saveProfil: (p: Profil) => Promise<void>;
   reset: () => void;
-  restore: (data: StoreState) => void;
+  restore: (data: StoreState) => Promise<void>;
   refresh: () => Promise<void>;
 };
 
@@ -97,9 +97,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     _setState(emptyState());
   }, []);
 
-  const restore = useCallback((data: StoreState) => {
-    dirty.current = true;
-    _setState(normalizeState(data));
+  const restore = useCallback(async (data: StoreState) => {
+    const clean = normalizeState(data);
+    if (timer.current) clearTimeout(timer.current);
+    // Simpan langsung ke server sebelum dianggap berhasil
+    await api("/api/data", { method: "PUT", body: clean });
+    dirty.current = false;
+    _setState(clean);
+    setSync("saved");
   }, []);
 
   const saveProfil = useCallback(

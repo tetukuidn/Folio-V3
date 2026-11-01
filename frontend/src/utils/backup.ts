@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
@@ -26,6 +27,17 @@ export function normalizeState(d: Partial<StoreState>): StoreState {
   };
 }
 
+const LAST_KEY = "folio_last_backup";
+
+export async function lastBackupAt(): Promise<number | null> {
+  const v = await AsyncStorage.getItem(LAST_KEY).catch(() => null);
+  return v ? Number(v) : null;
+}
+
+async function markBackup() {
+  await AsyncStorage.setItem(LAST_KEY, String(Date.now())).catch(() => undefined);
+}
+
 // Simpan semua data ke satu file backup Folio (.json)
 export async function simpanBackup(state: StoreState, profil: Profil): Promise<void> {
   const file: BackupFile = { app: "folio", version: 1, dibuat: new Date().toISOString(), data: state, profil };
@@ -38,8 +50,11 @@ export async function simpanBackup(state: StoreState, profil: Profil): Promise<v
     const a = doc.createElement("a");
     a.href = url;
     a.download = name;
+    doc.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    doc.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    await markBackup();
     return;
   }
   const uri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + name;
@@ -47,6 +62,7 @@ export async function simpanBackup(state: StoreState, profil: Profil): Promise<v
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, { mimeType: "application/json", dialogTitle: "Simpan file backup", UTI: "public.json" });
   }
+  await markBackup();
 }
 
 // Pilih file backup lalu baca isinya. null = dibatalkan.

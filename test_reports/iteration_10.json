@@ -1,0 +1,32 @@
+{
+  "summary": "Tested the Backup tab and the Dashboard backup reminder at 375x667, using a dedicated user test-backup (token test_backup_token) seeded with all 8 lists and the profil. The seed includes the optional fields hargaReseller and rusak.resellerId, a unicode/emoji name, and float berat. Backend: 5/5 pytest tests pass. They cover seed->GET exact, snapshot->wipe->restore exact, the backup wrapper being rejected with 422 (extra=forbid), a profil key inside data being rejected with 422, and 401 without auth. UI: backup-simpan downloads Backup_Folio_<date>.json with shape {app:'folio', version:1, dibuat, data{8 keys}, profil}. All 8 arrays/objects and the profil match the seed EXACTLY. The tab shows '7 catatan siap dibackup', and folio_last_backup is set. Restore: bad JSON and {app:'other'} both show the toast 'File bukan backup Folio' with no confirm box. A valid file shows backup-konfirmasi with '2 stok · 1 pesanan · 1 pesanan reseller · 1 supplier · 2 reseller'. backup-batal closes it and sends no PUT. backup-pulihkan sends PUT /api/profile + PUT /api/data. GET /api/data then equals the original EXACTLY in both cases tested: restore over wiped data, and restore over modified data (added and removed rows, a removed optional field, a changed sender). The sender form refreshes, and a second backup made after the restore is identical to the first. Reminder: hidden when there is no data. 'Belum ada backup di HP ini.' shows when the key is absent, and 'Backup terakhir 8 hari lalu.' shows for 8 days. It is hidden for 6 days. Nanti hides it. Backup sekarang goes to /ekspor. After saving a backup and going back via the Dashboard tab (no reload), the reminder is gone. Both buttons are 44px high. One real bug found: the restore success toast is shown before the data is saved. Restore saves data with a 700ms debounce, so reloading or closing the app right after Pulihkan loses the restored data while the profil is already restored.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Restore (backup-card.tsx pulihkan)", "issue": "pulihkan() calls restore(), which only updates local state and relies on the 700ms debounced PUT /api/data in store/index.tsx:71-88. It then awaits only saveProfil and immediately shows 'Data berhasil dipulihkan'. Reproduced: restore over empty data, then reload 300ms after tapping Pulihkan. The toast was shown, but the backend still had 0 belanja while the profil was already the restored one, a partial restore. The same happens if the app is closed or backgrounded on a phone. If PUT /api/data fails (network error, 413), the user still sees the success toast. Also, saveProfil errors are swallowed (.catch(() => undefined)).", "affected_testIDs": ["backup-pulihkan"]}
+    ],
+    "design_issues": [
+      {"screen": "Backup tab (/ekspor)", "issues": ["The tab label is 'Backup', but the screen header still reads 'Ekspor' with the subtitle 'Format Upload Order Everpro', which describes the export section and not the backup card at the top. Consider a header like 'Backup & Ekspor'."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_backup_roundtrip.py", "/app/backend/tests/seed_backup.py", "/app/test_reports/pytest/pytest_backup.xml"],
+  "action_items": [
+    "Make restore save immediately. Add something like store.restoreNow(data) that cancels the debounce timer, awaits PUT /api/data with normalizeState(data), and sets dirty=false. Only after that should saveProfil run and 'Data berhasil dipulihkan' be shown. On failure, show an error toast (e.g. 'Gagal memulihkan, coba lagi') and keep the confirm box open.",
+    "Optional: on native, simpanBackup calls markBackup() even when the user dismisses the share sheet without saving, which hides the reminder for a week. Consider marking only when shareAsync resolves without dismissal, where the platform reports it, or say in the UI that it was 'shared'.",
+    "Optional (web): on web, simpanBackup calls URL.revokeObjectURL right after a.click() on an anchor that is not in the DOM. This works in Chromium, but Firefox and Safari can drop the download. Append the anchor to document.body and revoke inside setTimeout.",
+    "Optional: rename the Backup tab header 'Ekspor / Format Upload Order Everpro' to match the tab label."
+  ],
+  "critical_code_review_comments": [
+    "backup.ts pilihBackup: normalizeState drops unknown keys, so restore never sends extra fields, which is good with extra=forbid. A backup missing newer lists (e.g. no rusak) restores them as [], which wipes them. That is acceptable for a replace-all, but the confirm box doesn't list rusak/retur counts, so the user can't see that.",
+    "backup-reminder.tsx: 'Nanti' hiding is component state only, so the reminder comes back on the next app launch. That is fine for a gentle reminder.",
+    "The reminder counts days with Math.floor, so a device clock change can produce odd values. Not an issue in practice."
+  ],
+  "updated_files": ["/app/backend/tests/seed_backup.py", "/app/backend/tests/test_backup_roundtrip.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "~93%: every backup, restore and reminder check passed except restore persistence when the app is reloaded within the 700ms save window"},
+  "seed_data_creation": "User test-backup / token test_backup_token. The full SEED (2 belanja, 1 rusak, 1 supplier, 1 pesanan, sender, 2 resellers, 1 pesananReseller, 1 returReseller) plus PROFIL was re-seeded at the end with `python /app/backend/tests/seed_backup.py seed`. Other modes: empty, show.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Browser clock in automation is 2026-11-01. Downloads: use page.expect_download on backup-simpan. Restore: use page.expect_file_chooser on backup-pilih, then set_files. Retest the race with seed_backup.py empty -> restore /tmp backup -> reload after 300ms -> expect GET /api/data to equal SEED. A sample backup file can be made by clicking backup-simpan while seeded."
+}

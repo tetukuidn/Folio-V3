@@ -76,7 +76,7 @@ export default function EksporScreen() {
   }
 
   return (
-    <Screen title="Ekspor" subtitle="Format Upload Order Everpro">
+    <Screen title="Backup" subtitle="Backup data & ekspor Everpro">
       <BackupCard />
       <Card>
         <Text style={styles.cardTitle}>Data pengirim (isi sekali)</Text>

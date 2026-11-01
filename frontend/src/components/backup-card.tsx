@@ -41,10 +41,12 @@ export function BackupCard() {
     if (!pending) return;
     setBusy(true);
     try {
-      restore(pending.data);
-      await saveProfil(pending.profil).catch(() => undefined);
+      await restore(pending.data);
+      await saveProfil(pending.profil);
       toast.show("Data berhasil dipulihkan");
       setPending(null);
+    } catch {
+      toast.show("Gagal memulihkan data — periksa koneksi lalu coba lagi");
     } finally {
       setBusy(false);
     }

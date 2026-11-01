@@ -1,0 +1,26 @@
+{
+  "summary": "Retested the iteration_10 restore bug and its related changes at 375x667 as user test-backup. FIXED: when Pulihkan is tapped, PUT /api/data (200 at +72ms) now completes before PUT /api/profile starts (200 at +133ms), and the toast 'Data berhasil dipulihkan' appears at +193ms. Reloading as soon as the toast appeared left GET /api/data EXACTLY equal to the backup (all 8 keys) and the profil restored, so the partial restore is gone. Failure path, tested with PUT /api/data blocked by page.route returning 500 and also aborted: the toast 'Gagal memulihkan data — periksa koneksi lalu coba lagi' shows, no success toast, backup-konfirmasi stays open, the server stays unchanged (0 belanja, profil 'X'), and PUT /api/profile is not sent. Retrying after the failure restores exactly. Web download: backup-simpan downloads Backup_Folio_2026-11-01.json with {app, version, dibuat, data(8 keys), profil} equal to the server, and no anchor is left in the DOM. The header reads 'Backup' with the subtitle 'Backup data & ekspor Everpro'. Reminder regression: shown when no key is set, hidden at 2 days, shown at 9 days with 'Backup terakhir 9 hari lalu.' New minor bug in toast.tsx: if a new toast is shown while the previous toast is fading out (about 2.0-2.2s after it), the new toast is hidden at once. Reproduced deterministically: after a failed restore, tapping Pulihkan again 1950ms later restored the data, but the success toast never appeared.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ToastProvider (src/components/toast.tsx show())", "issue": "When show() is called during the 220ms fade-out of the previous toast, Animated.timing(toValue:1) stops the fade-out. The stopped animation still runs its start() callback, which calls setMsg(null) without checking `finished`, so the new message is wiped immediately. Repro: fail a restore, wait about 1.95s, then tap Pulihkan again. The data is restored, but 'Data berhasil dipulihkan' is never shown. This affects every toast in the app, not only backup.", "testID": "toast-text", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/seed_backup.py"],
+  "action_items": [
+    "toast.tsx: change the fade-out callback to `.start(({ finished }) => { if (finished) setMsg(null); })` and call op.stopAnimation() before fading in, so a new toast shown during the fade-out is not cleared."
+  ],
+  "critical_code_review_comments": [
+    "store restore(): it clears the pending debounce timer but leaves dirty=true until the PUT succeeds. If the restore PUT fails, any unsaved local edits made just before the restore are not re-scheduled until the next state change. This is an edge case, and acceptable because the user is about to replace the data anyway.",
+    "backup-card pulihkan(): if PUT /api/data succeeds but PUT /api/profile fails, the data is restored but the toast says the restore failed. A retry is idempotent, so this is fine."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only request)", "frontend": "100% of requested retests passed (restore save ordering, reload exactness, 500/abort failure path, retry, download, header, reminder). One new low-priority toast race found."},
+  "seed_data_creation": "User test-backup / token test_backup_token. Re-seeded with `python /app/backend/tests/seed_backup.py seed` at the end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login on web: localStorage.setItem('lpm_session_token','test_backup_token'). Browser clock is 2026-11-01. Failure path: page.route('**/api/data') fulfilling PUT with 500. Toast testID: toast-text. Reminder key: localStorage folio_last_backup (ms)."
+}

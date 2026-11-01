@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "@/src/components/screen";
 import { ProfilCard } from "@/src/components/profil-card";
+import { BackupReminder } from "@/src/components/backup-reminder";
 import { useToast } from "@/src/components/toast";
 import { useStore } from "@/src/store";
 import { useAuth } from "@/src/auth";
@@ -253,6 +254,8 @@ export default function DashboardScreen() {
           {hariIni.jml} pesanan · {hariIni.pohon} pohon keluar
         </Text>
       </LinearGradient>
+
+      <BackupReminder hasData={state.belanja.length + state.pesanan.length + (state.pesananReseller || []).length > 0} />
 
       <Shortcut
         icon="leaf-outline"
