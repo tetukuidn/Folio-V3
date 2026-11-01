@@ -78,6 +78,7 @@ export type Sender = {
   telp: string;
   kec: string;
   kota: string;
+  isiPaket?: string; // teks Isi Paket default untuk ekspor Everpro
 };
 
 export type StoreState = {

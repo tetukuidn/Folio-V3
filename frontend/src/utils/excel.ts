@@ -43,7 +43,7 @@ export function rowFor(p: Pesanan, sender: Sender, no: number): (string | number
   if (jenisPengiriman === "DROPOFF" && p.kurir === "J&T Express") jenisPengiriman = "PICKUP";
   if (jenisPengiriman === "COD DROPOFF" && p.kurir === "J&T Express") jenisPengiriman = "COD PICKUP";
 
-  const isi = "Aglonema";
+  const isi = sender.isiPaket?.trim() || "Aglonema";
   const omset = (p.transfer || 0) - (p.karantina || 0) - (p.codOngkir ? 0 : p.ongkir || 0);
   const nilaiCod = cod ? (p.codOngkir ? p.ongkir : p.transfer) : "";
   const hargaBarang = cod ? "" : omset;

@@ -96,6 +96,15 @@ export default function EksporScreen() {
         <Field label="Kota">
           <Input value={state.sender.kota} onChangeText={(v) => setSender("kota", v)} testID="sender-kota" />
         </Field>
+        <Field label="Isi Paket (default semua pesanan)">
+          <Input
+            value={state.sender.isiPaket ?? ""}
+            onChangeText={(v) => setSender("isiPaket", v)}
+            placeholder="Aglonema"
+            testID="sender-isi-paket"
+          />
+        </Field>
+        <Text style={styles.muted}>Kosongkan untuk memakai &quot;Aglonema&quot;.</Text>
       </Card>
 
       <Card>
