@@ -106,7 +106,10 @@ export default function PesananBaruScreen() {
     if (editReseller) return { ...state, pesananReseller: (state.pesananReseller || []).filter((p) => p.id !== editId) };
     return { ...state, pesanan: state.pesanan.filter((p) => p.id !== editId) };
   }, [state, editId, editReseller]);
-  const allJenis = useMemo(() => jenisList(state), [state]);
+  const allJenis = useMemo(
+    () => jenisList(state).sort((a, b) => a.localeCompare(b, "id", { sensitivity: "base", numeric: true })),
+    [state]
+  );
   const activeResellers = (state.resellers || []).filter((r) => r.aktif !== false || r.id === resellerId);
   const reseller = (state.resellers || []).find((r) => r.id === resellerId);
   const rOptions = activeResellers.filter((r) => !rSearch.trim() || r.nama.toLowerCase().includes(rSearch.trim().toLowerCase()));
@@ -369,6 +372,11 @@ export default function PesananBaruScreen() {
               ] as string[]
             }
             labelFor={(v) => (v === PAKET_KEY ? "Paket (pilih beberapa jenis)" : `${v} · sisa ${sisaStok(stokState, v)}`)}
+            renderOption={(v) => (
+              <Text style={[styles.pickerOpt, v === PAKET_KEY && { fontFamily: fonts.bold }]}>
+                {v === PAKET_KEY ? "Paket (pilih beberapa jenis)" : `${v} · sisa ${sisaStok(stokState, v)}`}
+              </Text>
+            )}
             onChange={(v) => {
               if (v === PAKET_KEY) patchForm({ paket: !form.paket });
               else {
@@ -631,6 +639,7 @@ export default function PesananBaruScreen() {
 }
 
 const styles = StyleSheet.create({
+  pickerOpt: { fontFamily: fonts.medium, fontSize: fontSize.lg - 1, color: colors.onSurface },
   muted: { fontFamily: fonts.body, color: colors.muted, fontSize: fontSize.base - 1 },
   itemRow: {
     borderWidth: 1,
