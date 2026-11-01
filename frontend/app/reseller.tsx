@@ -89,6 +89,9 @@ export default function ResellerScreen() {
   const labaRes = st.transfer - st.ongkir - st.karantina - st.ops - jualRes;
   const marginRes = pct(labaRes, st.transfer - st.ongkir - st.karantina);
   const modalPct = pct(jualRes, st.transfer);
+  // Profit penjualan = Harga jual (Stok barang) − HPP
+  const profitJual = jualRes - st.hpp;
+  const marginJual = pct(profitJual, jualRes);
   const returF = returs.filter((r) => byRes(r.resellerId) && inRange(r.tgl));
   const rusakF = rusakRes.filter((r) => byRes(r.resellerId || "") && inRange(r.tgl));
 
@@ -302,6 +305,26 @@ export default function ResellerScreen() {
           </View>
           <View style={styles.labaIcon}>
             <Ionicons name={labaRes < 0 ? "trending-down" : "trending-up"} size={20} color={labaRes < 0 ? colors.accent : colors.brandPrimary} />
+          </View>
+        </View>
+        <View style={[styles.labaBox, { marginTop: spacing.sm }, profitJual < 0 && styles.labaBoxNeg]} testID="res-profit-jual">
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" }}>
+              <Text style={[styles.labaLbl, profitJual < 0 && { color: colors.accent }]}>Laba Bersih (Profit)</Text>
+              <View style={styles.marginPill}>
+                <Text style={[styles.marginText, profitJual < 0 && { color: colors.accent }]} testID="res-margin-jual">
+                  {marginJual >= 0 ? "+" : ""}
+                  {marginJual.toFixed(1)}% Margin
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.labaVal, profitJual < 0 && { color: colors.accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              {formatRp(profitJual)}
+            </Text>
+            <Text style={styles.finNote} numberOfLines={1}>Harga jual − HPP</Text>
+          </View>
+          <View style={styles.labaIcon}>
+            <Ionicons name={profitJual < 0 ? "trending-down" : "trending-up"} size={20} color={profitJual < 0 ? colors.accent : colors.brandPrimary} />
           </View>
         </View>
       </View>
