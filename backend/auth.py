@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -10,6 +11,20 @@ from db import db
 
 EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 SESSION_DAYS = 7
+
+
+def _allowed() -> list:
+    # Daftar email yang boleh masuk. Entri diawali "@" = seluruh domain (mis. @example.com untuk akun uji).
+    raw = os.environ.get("ALLOWED_EMAILS", "")
+    return [e.strip().lower() for e in raw.split(",") if e.strip()]
+
+
+def is_email_allowed(email: str) -> bool:
+    allowed = _allowed()
+    if not allowed:
+        return True
+    email = (email or "").strip().lower()
+    return any(email == a or (a.startswith("@") and email.endswith(a)) for a in allowed)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -35,6 +50,9 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
     user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="user_not_found")
+    if not is_email_allowed(user.get("email", "")):
+        await db.user_sessions.delete_one({"session_token": token})
+        raise HTTPException(status_code=403, detail="email_not_allowed")
     return user
 
 
@@ -65,6 +83,8 @@ async def create_session(payload: SessionRequest):
     email = (data.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(status_code=401, detail="email_missing")
+    if not is_email_allowed(email):
+        raise HTTPException(status_code=403, detail="email_not_allowed")
     session_token = data.get("session_token")
     if not session_token:
         raise HTTPException(status_code=401, detail="session_token_missing")

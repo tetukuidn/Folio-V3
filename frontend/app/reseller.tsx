@@ -310,7 +310,7 @@ export default function ResellerScreen() {
         <View style={[styles.labaBox, { marginTop: spacing.sm }, profitJual < 0 && styles.labaBoxNeg]} testID="res-profit-jual">
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" }}>
-              <Text style={[styles.labaLbl, profitJual < 0 && { color: colors.accent }]}>Laba Bersih (Profit)</Text>
+              <Text style={[styles.labaLbl, profitJual < 0 && { color: colors.accent }]}>Laba bersih saya</Text>
               <View style={styles.marginPill}>
                 <Text style={[styles.marginText, profitJual < 0 && { color: colors.accent }]} testID="res-margin-jual">
                   {marginJual >= 0 ? "+" : ""}

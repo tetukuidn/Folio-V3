@@ -57,7 +57,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       try {
         await fetchData();
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) await signOut();
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) await signOut();
       } finally {
         if (alive) setLoaded(true);
       }
@@ -78,7 +78,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setSync("saved");
         dirty.current = false;
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) await signOut();
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) await signOut();
         else setSync("error");
       }
     }, 700);

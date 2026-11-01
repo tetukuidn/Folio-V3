@@ -38,6 +38,11 @@ function redirectUrl(): string {
   return Linking.createURL("");
 }
 
+function pesanError(e: any, fallback: string): string {
+  if (e?.message === "email_not_allowed") return "Akun ini tidak diizinkan membuka aplikasi";
+  return e?.message || fallback;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -74,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (alive) setLoading(false);
               return;
             } catch (e: any) {
-              if (alive) setError(e?.message || "Gagal masuk");
+              if (alive) setError(pesanError(e, "Gagal masuk"));
             }
           }
         } else {
@@ -86,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (alive) setLoading(false);
               return;
             } catch (e: any) {
-              if (alive) setError(e?.message || "Gagal masuk");
+              if (alive) setError(pesanError(e, "Gagal masuk"));
             }
           }
         }
@@ -100,7 +105,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const res = await api<{ user: AuthUser }>("/api/auth/me");
           if (alive) setUser(res.user);
         } catch (e) {
-          if (e instanceof ApiError && e.status === 401) await clearToken();
+          if (e instanceof ApiError && (e.status === 401 || e.status === 403)) await clearToken();
+          if (e instanceof ApiError && e.status === 403 && alive) setError(pesanError(e, "Gagal masuk"));
           if (alive) setUser(null);
         }
       } finally {
@@ -118,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const sub = Linking.addEventListener("url", ({ url }) => {
       hotUrl.current = url;
       const sid = extractSessionId(url);
-      if (sid) exchange(sid).catch((e) => setError(e?.message || "Gagal masuk"));
+      if (sid) exchange(sid).catch((e) => setError(pesanError(e, "Gagal masuk")));
     });
     return () => sub.remove();
   }, [exchange]);
@@ -152,7 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       await exchange(sid);
     } catch (e: any) {
-      setError(e?.message || "Gagal masuk dengan Google");
+      setError(pesanError(e, "Gagal masuk dengan Google"));
     } finally {
       setSigningIn(false);
     }
